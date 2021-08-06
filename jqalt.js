@@ -1089,6 +1089,7 @@
           while(e != null && !$.isQuery(e, sel)){
             e = e.previousElementSibling;
           }
+          if(!$.isQuery(e, sel)){return null;}
           return e;
         }).filter(e => e != null);
       }
@@ -1113,6 +1114,7 @@
           while(e != null && !$.isQuery(e, sel)){
             e = e.previousElementSibling;
           }
+          if(!$.isQuery(e, sel)){return null;}
           return e;
         }).filter(e => e != null);
       }
@@ -1121,7 +1123,32 @@
 
 
     parent(sel){
-      return new Element(this[0].parentNode);
+      if(typeof sel === 'number'){
+        return this.map(e => {
+          if(sel < 0){
+            //todo: get element depth within document
+          }
+          for(let i = 0; i < sel; i++){
+            let n = e.parentNode;
+            if(!n){break;}
+            e = n;
+          }
+          return e;
+        }).filter(e => e != null);
+      }
+      if(typeof sel === 'string'){
+        return this.map(e => {
+          e = e.parentNode;
+          while(e != null && !$.isQuery(e, sel)){
+            e = e.parentNode;
+          }
+          if(!$.isQuery(e, sel)){return null;}
+          return e;
+        }).filter(e => e != null);
+      }
+      return this.map(e => e.parentNode).filter(e => e != null);
+
+      //return new Element(this[0].parentNode);
     }
 
     child(sel, index, node){
@@ -1539,6 +1566,8 @@
     if(Array.isArray(elm)){
       return elm.map(e => $.isQuery(e));
     }
+
+    //todo: improve function (split by commas and spaces, to improve capabilities)
 
     let match = true;
     sel.replace(/\[\s*([\w_\-$\.]+)\s*=\s*(["'])((?:\\[\\"']|.)*?)\1\s*\]/g, function(_, key, q, value){

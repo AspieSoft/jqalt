@@ -10,10 +10,4 @@
 
   $('.main-content').tag('main');
 
-  
-
-  //todo: test: next, previous, parent
-
-  //console.log($('h2').previous('a'));
-
 });
