@@ -3,6 +3,8 @@
 This script is a attempt to replace the heavy jquery with a lightweight alternative.
 Rather than completely copying what jquery does, this module brings some different capabilities.
 
+This idea was inspired by [A YouTube Video I Watched](https://www.youtube.com/watch?v=5MFnKG15ZfI) from [Web Dev Simplified](https://www.youtube.com/channel/UCFbNIlppjAuEX4znoulh0Cw), and I decided to expand on the idea.
+
 I have used JQuery a lot, and its great, but it is old. Modern javascript now has builtin functions, and [The IE browser is finally being retired](https://www.theverge.com/2021/5/19/22443997/microsoft-internet-explorer-end-of-support-date).
 Soon, the bulk of old browser support may not be as necessary, and taking out JQuery as a dependency can help site performance.
 

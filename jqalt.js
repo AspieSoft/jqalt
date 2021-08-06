@@ -1076,7 +1076,7 @@
         return this.map(e => {
           if(sel < 0){sel = e.parentNode.children.length - Math.abs(sel);}
           for(let i = 0; i < sel; i++){
-            let n = e.nextElementSibling;
+            let n = e.previousElementSibling;
             if(!n){break;}
             e = n;
           }
@@ -1085,17 +1085,17 @@
       }
       if(typeof sel === 'string'){
         return this.map(e => {
-          e = e.nextElementSibling;
+          e = e.previousElementSibling;
           while(e != null && !$.isQuery(e, sel)){
-            e = e.nextElementSibling;
+            e = e.previousElementSibling;
           }
           return e;
         }).filter(e => e != null);
       }
-      return this.map(e => e.nextElementSibling).filter(e => e != null);
+      return this.map(e => e.previousElementSibling).filter(e => e != null);
     }
 
-    previous(){
+    previous(sel){
       if(typeof sel === 'number'){
         return this.map(e => {
           if(sel < 0){sel = e.parentNode.children.length - Math.abs(sel);}
@@ -1120,7 +1120,7 @@
     }
 
 
-    parent(){
+    parent(sel){
       return new Element(this[0].parentNode);
     }
 
