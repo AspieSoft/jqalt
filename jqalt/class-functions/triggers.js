@@ -105,8 +105,8 @@ $.addMethod('on', function(event, sel, cb){
     this.forEach(elm => {
       for(let i = 0; i < event.length; i++){
         elm.addEventListener(event[i], e => {
-          if(e.target.matches(sel)){
-            cb.call(this.cloneData(elm), e);
+          if($.isQuery(e.target, sel)){
+            callFunc(cb, fromElm(this, elm), e);
           }
         }, {passive: false});
       }
@@ -123,16 +123,121 @@ $.addMethod('on', function(event, sel, cb){
   return this;
 });
 
-$.addMethod('do', 'trigger', function(event, opts = {}){
-  if(typeof event === 'object' && !Array.isArray(event)){
+$.addMethod('do', 'trigger', function(event, sel, opts = {}){
+  if(typeof sel === 'object' && !Array.isArray(sel)){
     [event, opts] = [opts, event];
   }
+  if(!Array.isArray(event)){event = [event];}
+  this.forEach(elm => {
+    for(let i = 0; i < event.length; i++){
+      if($.isQuery(elm, sel)){
+        elm.dispatchEvent(new Event(event[i], opts));
+      }
+    }
+  });
+  return this;
+});
+
+
+//todo: test onStop and onIdle functions
+
+$.addMethod('onStop', function(event, sel, cb, delay){
+  [sel, cb, delay] = $.sort([sel, 'str'], [cb, 'func'], [delay, 'num']);
   if(!Array.isArray(event)){
     event = [event];
   }
+  if(!delay){delay = 1000;}
+
+  if(typeof cb !== 'function'){return this;}
+
+  if(sel){
+    this.forEach(elm => {
+      for(let i = 0; i < event.length; i++){
+        let lastRan = undefined;
+        let ev = undefined;
+        setInterval(function(){
+          if(lastRan === undefined){return;}
+          let now = (new Date().getTime());
+          if(now - delay > lastRan){
+            callFunc(cb, fromElm(this, elm), ev, (now - lastRan));
+            lastRan = undefined;
+          }
+        }, Math.min(100, delay));
+        elm.addEventListener(event[i], e => {
+          if($.isQuery(e.target, sel)){
+            ev = e;
+            lastRan = (new Date().getTime());
+          }
+        }, {passive: false});
+      }
+    });
+    return this;
+  }
   this.forEach(elm => {
     for(let i = 0; i < event.length; i++){
-      elm.dispatchEvent(new Event(event[i], opts));
+      let lastRan = undefined;
+      let ev = undefined;
+      setInterval(function(){
+        if(lastRan === undefined){return;}
+        let now = (new Date().getTime());
+        if(now - delay > lastRan){
+          callFunc(cb, fromElm(this, elm), ev, (now - lastRan));
+          lastRan = undefined;
+        }
+      }, Math.min(100, delay));
+      elm.addEventListener(event[i], e => {
+        ev = e;
+        lastRan = (new Date().getTime());
+      }, {passive: false});
+    }
+  });
+  return this;
+});
+
+$.addMethod('onIdle', function(event, sel, cb, delay){
+  [sel, cb, delay] = $.sort([sel, 'str'], [cb, 'func'], [delay, 'num']);
+  if(!Array.isArray(event)){
+    event = [event];
+  }
+  if(!delay){delay = 1000;}
+
+  if(typeof cb !== 'function'){return this;}
+
+  if(sel){
+    this.forEach(elm => {
+      for(let i = 0; i < event.length; i++){
+        let lastRan = (new Date().getTime());
+        let ev = undefined;
+        setInterval(function(){
+          let now = (new Date().getTime());
+          if(now - delay > lastRan){
+            callFunc(cb, fromElm(this, elm), ev, (now - lastRan));
+          }
+        }, Math.min(100, delay));
+        elm.addEventListener(event[i], e => {
+          if($.isQuery(e.target, sel)){
+            ev = e;
+            lastRan = (new Date().getTime());
+          }
+        }, {passive: false});
+      }
+    });
+    return this;
+  }
+  this.forEach(elm => {
+    for(let i = 0; i < event.length; i++){
+      let lastRan = (new Date().getTime());
+      let ev = undefined;
+      setInterval(function(){
+        let now = (new Date().getTime());
+        if(now - delay > lastRan){
+          callFunc(cb, fromElm(this, elm), ev, (now - lastRan));
+        }
+      }, Math.min(100, delay));
+      elm.addEventListener(event[i], e => {
+        ev = e;
+        lastRan = (new Date().getTime());
+      }, {passive: false});
     }
   });
   return this;
