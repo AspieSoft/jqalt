@@ -7,10 +7,9 @@ $.addMethod('append', function(sel, ref){
   this.forEach(e => {
     if(ref){ref = $(ref, e)[0].nextElementSibling;}
     if(ref){
-      //todo: fix strange issue with insertBefore and for loop
-      console.log(sel);
       for(let i = sel.length-1; i >= 0; i--){
         e.insertBefore(sel[i], ref);
+        ref = sel[i];
       }
     }else{
       for(let i = 0; i < sel.length; i++){
