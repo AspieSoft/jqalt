@@ -14,7 +14,7 @@ JQuery still has a nice syntax though, and the vanilla js `document.querySelecto
 
 ```html
 
-<script src="https://cdn.jsdelivr.net/gh/jquery/jquery@0.0.2/jqalt/index.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/jquery/jquery@0.0.3/jqalt/index.js"></script>
 
 ```
 
