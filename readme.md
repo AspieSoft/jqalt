@@ -22,7 +22,7 @@ JQuery still has a nice syntax though, and the vanilla js `document.querySelecto
 
 ```javascript
 
-if(typeof jqAlt !== 'undefined){
+if(typeof jqAlt !== 'undefined'){
   // module is installed
 }
 
