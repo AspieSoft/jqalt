@@ -1,4 +1,5 @@
 import {$} from './selector.js'
+import Socket from './socket-io.js'
 import './common.js'
 import './class-functions/all.js'
 

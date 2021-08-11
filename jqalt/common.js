@@ -1,5 +1,6 @@
 import { func, callFunc, fixTypeStr, getAjaxContentType } from './functions.js'
 import Element, {$} from './selector.js'
+import Socket from './socket-io.js'
 
 
 $.ready = function(cb){
@@ -139,6 +140,10 @@ $.isElement = function(v){
   return !!(v instanceof Element);
 };
 
+$.isSocket = function(v){
+  return !!(v instanceof Socket);
+};
+
 
 const ranFunctions = [];
 $.once = function(id, cb){
@@ -216,6 +221,8 @@ $.type = function(value, types){
   let type;
   if(value instanceof Element){
     type = 'element';
+  }else if(value instanceof Socket){
+    type = 'socket';
   }else if(value instanceof NodeList){
     type = 'nodelist';
   }else if(value instanceof Node){
