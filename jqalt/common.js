@@ -276,11 +276,11 @@ $.isQuery = function(elm, sel){
   if(!match){return false;}
 
   sel.replace(/([.#]|)([\w_\-$\.]+)/g, function(_, key, value){
-    if(key === '.' && !elm.classList.contains(value)){
+    if(key === '.' && !elm.classList?.contains(value)){
       match = false;
     }else if(key === '#' && elm.id !== value){
       match = false;
-    }else if(elm.tagName.toLowerCase() !== value.toLowerCase()){
+    }else if(key === '' && elm.tagName?.toLowerCase() !== value.toLowerCase()){
       match = false;
     }
   });

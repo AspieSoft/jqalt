@@ -82,7 +82,7 @@ $.addMethod('parent', function(sel){
 });
 
 $.addMethod('child', function(sel, index, node){
-  [sel, index, node] = $.sort([sel, 'str'], [index, 'num'], [node, 'bool']);
+  [sel, index, node] = $.sort([sel, 'str', 'arr'], [index, 'num'], [node, 'bool']);
 
   let result = [];
   this.forEach(elm => {

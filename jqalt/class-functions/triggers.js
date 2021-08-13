@@ -96,7 +96,7 @@ $.addMethod('on', function(event, sel, cb){
     [sel, cb] = [cb, sel];
   }
   if(!Array.isArray(event)){
-    event = [event];
+    event = event.split(' ');
   }
 
   if(typeof cb !== 'function'){return this;}
@@ -136,6 +136,43 @@ $.addMethod('do', 'trigger', function(event, sel, opts = {}){
     }
   });
   return this;
+});
+
+//todo: build is function to run .matches
+$.addMethod('is', function(sel, cb){
+  if(typeof sel === 'function'){
+    [sel, cb] = [cb, sel];
+  }
+
+  let selIsArr = Array.isArray(sel);
+
+  let matches = [];
+  this.forEach((e, index) => {
+    if(selIsArr){
+      let m = false;
+      for(let i in sel){
+        if(e.matches(sel[i])){
+          m = true;
+        }
+      }
+      if(m){
+        matches.push(index);
+      }
+    }else if(e.matches(sel)){
+      matches.push(index);
+    }
+  });
+
+  if(!matches.length){
+    matches = false;
+  }
+
+  if(cb){
+    callFunc(cb, this, matches);
+    return this;
+  }
+
+  return matches;
 });
 
 
