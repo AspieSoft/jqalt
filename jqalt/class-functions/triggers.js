@@ -65,10 +65,10 @@ $.addMethod('loop', function(ms, sel, cb, limit){
       if(sel){
         getQuery(sel, elm).forEach(e => {
           function stop(){clearInterval(interval);}
-          cb = func(cb, [fromElm(this, e),,{stop}]);
+          let callback = func(cb, [fromElm(this, e),,{stop}]);
 
           const interval = setInterval(() => {
-            cb.call(limit);
+            callback.call(limit);
             if(limit !== undefined && --limit <= 0){
               clearInterval(interval);
             }
@@ -76,10 +76,10 @@ $.addMethod('loop', function(ms, sel, cb, limit){
         });
       }else{
         function stop(){clearInterval(interval);}
-        cb = func(cb, [fromElm(this, elm),,{stop}]);
+        let callback = func(cb, [fromElm(this, elm),,{stop}]);
 
         const interval = setInterval(() => {
-          cb.call(limit);
+          callback.call(limit);
           if(limit !== undefined && --limit <= 0){
             clearInterval(interval);
           }
