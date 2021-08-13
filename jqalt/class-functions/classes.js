@@ -91,6 +91,29 @@ $.addMethod('removeClass', function(className){
   return this;
 });
 
+$.addMethod('toggleClass', function(className, cb){
+  if(typeof className === 'function'){
+    [className, cb] = [cb, className];
+  }
+  className = className.split(' ').filter(c => c.trim() !== '');
+  this.forEach(e => {
+    for(let i in className){
+      if(e.classList.contains(className[i])){
+        e.classList.remove(className[i]);
+        if(typeof cb === 'function'){
+          callFunc(cb, fromElm(this, e), className[i], false);
+        }
+      }else{
+        e.classList.add(className[i]);
+        if(typeof cb === 'function'){
+          callFunc(cb, fromElm(this, e), className[i], true);
+        }
+      }
+    }
+  });
+  return this;
+});
+
 
 $.addMethod('css', function(key, value){
   const keyType = varType(key);

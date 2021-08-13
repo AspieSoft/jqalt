@@ -44,6 +44,8 @@ $.addMethod('each', function(sel, cb){
   if(typeof sel === 'function'){
     [sel, cb] = [cb, sel];
   }
+  if(typeof cb !== 'function'){return this;}
+
   this.forEach(elm => {
     if(elm != null){
       if(sel){
@@ -123,15 +125,16 @@ $.addMethod('on', function(event, sel, cb){
   return this;
 });
 
-$.addMethod('do', 'trigger', function(event, sel, opts = {}){
+$.addMethod('do', 'trigger', function(event, sel, opts){
   if(typeof sel === 'object' && !Array.isArray(sel)){
-    [event, opts] = [opts, event];
+    [sel, opts] = [opts, sel];
   }
+
   if(!Array.isArray(event)){event = [event];}
   this.forEach(elm => {
     for(let i = 0; i < event.length; i++){
-      if($.isQuery(elm, sel)){
-        elm.dispatchEvent(new Event(event[i], opts));
+      if(!sel || $.isQuery(elm, sel)){
+        elm.dispatchEvent(new Event(event[i], (opts || {})));
       }
     }
   });
@@ -173,6 +176,37 @@ $.addMethod('is', function(sel, cb){
   }
 
   return matches;
+});
+
+
+$.addMethod('focus', function(sel, cb){
+  if(typeof sel === 'function'){
+    [sel, cb] = [cb, sel];
+  }
+  if(typeof cb === 'function'){
+    return this.on('focusin', sel, cb);
+  }
+
+  this.forEach(e => {
+    e.focus();
+  });
+
+  return this;
+});
+
+$.addMethod('blur', function(sel, cb){
+  if(typeof sel === 'function'){
+    [sel, cb] = [cb, sel];
+  }
+  if(typeof cb === 'function'){
+    return this.on('focusout', sel, cb);
+  }
+
+  this.forEach(e => {
+    e.blur();
+  });
+
+  return this;
 });
 
 
