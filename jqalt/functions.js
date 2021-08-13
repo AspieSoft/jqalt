@@ -163,6 +163,9 @@ function buildHtmlElmArray(param){
 
 
 function func(cb, args, end){
+  if(typeof cb !== 'function'){
+    return {call: function(){}};
+  }
   if(!cb.toString().startsWith('f')){
     // arrow function
     if(Array.isArray(args)){
