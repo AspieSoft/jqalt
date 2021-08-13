@@ -1,3 +1,5 @@
+import Element from './selector.js';
+
 const elementUrlTagTypes = {
   src: [
     'iframe',
