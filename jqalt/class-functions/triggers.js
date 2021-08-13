@@ -76,7 +76,7 @@ $.addMethod('loop', function(ms, sel, cb, limit){
         });
       }else{
         function stop(){clearInterval(interval);}
-        cb = func(cb, [fromElm(this, e),,{stop}]);
+        cb = func(cb, [fromElm(this, elm),,{stop}]);
 
         const interval = setInterval(() => {
           cb.call(limit);
