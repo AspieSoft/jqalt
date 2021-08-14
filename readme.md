@@ -14,7 +14,7 @@ JQuery still has a nice syntax though, and the vanilla js `document.querySelecto
 
 ```html
 
-<script src="https://cdn.jsdelivr.net/gh/AspieSoft/jqalt@0.0.11/jqalt/index.js" type="module"></script>
+<script src="https://cdn.jsdelivr.net/gh/AspieSoft/jqalt@0.0.12/jqalt/index.js" type="module"></script>
 
 <!-- or load from jqalt.com (unsure if domain will be temporary) (currently a redirect) (surprised it was available) -->
 <script src="https://cdn.jqalt.com/index.js" type="module"></script>
