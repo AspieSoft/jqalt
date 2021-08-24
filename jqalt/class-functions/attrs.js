@@ -2,7 +2,7 @@ import { elementUrlTagTypes, callFunc, varType, fromElm } from '../functions.js'
 import {$} from '../selector.js'
 
 
-$.addMethod('attr', function(key, value){
+$.addMethod('attr', 'prop', function(key, value){
   const keyType = varType(key);
 
   if(keyType === 'function'){
@@ -15,8 +15,10 @@ $.addMethod('attr', function(key, value){
   if(keyType === 'object'){
     let keys = Object.keys(key);
     for(let i in keys){
+      if(keys[i] === 'tag'){keys[i] = 'tagName';}
       this.forEach(elm => {
         elm.setAttribute(keys[i], key[keys[i]]);
+        if(elm[keys[i]] !== undefined){elm[keys[i]] = key[keys[i]];}
       });
     }
     return this;
@@ -25,13 +27,16 @@ $.addMethod('attr', function(key, value){
     let res = {};
     if(value === $.del){
       for(let i in key){
+        if(key[i] === 'tag'){key[i] = 'tagName';}
         this.forEach(elm => {
           elm.removeAttribute(key[i]);
+          if(elm[key[i]] !== undefined){elm[key[i]] = undefined;}
         });
       }
     }
     for(let i in key){
-      res[key[i]] = this[0].getAttribute(key[i]);
+      if(key[i] === 'tag'){key[i] = 'tagName';}
+      res[key[i]] = (this[0].getAttribute(key[i]) || this[0][key[i]]);
     }
     if(typeof value === 'function'){
       callFunc(value, this, res);
@@ -39,17 +44,23 @@ $.addMethod('attr', function(key, value){
     }
     return res;
   }
+  if(key === 'tag'){key = 'tagName';}
   if(value === $.del){
     this.forEach(elm => {
       elm.removeAttribute(key);
+      if(elm[key] !== undefined){elm[key] = undefined;}
     });
     return this;
   }else if(typeof value === 'function'){
-    callFunc(value, this, this[0].getAttribute(key));
+    callFunc(value, this, (this[0].getAttribute(key) || this[0][key]));
     return this;
   }
   if(value === undefined){
-    return this[0].getAttribute(key);
+    return this[0].getAttribute(key) || this[0][key];
+  }
+  if(key === 'tagName'){
+    this.tag(value);
+    return this;
   }
   this.forEach(elm => {
     elm.setAttribute(key, value);
@@ -57,7 +68,7 @@ $.addMethod('attr', function(key, value){
   return this;
 });
 
-$.addMethod('hasAttr', function(key, value){
+$.addMethod('hasAttr', 'hasProp', function(key, value){
   const keyType = varType(key);
   let cb;
   if(typeof value === 'function'){
@@ -76,7 +87,8 @@ $.addMethod('hasAttr', function(key, value){
     let res = [];
     let keys = Object.keys(key);
     for(let i in keys){
-      if(key[keys[i]] === this[0].getAttribute(keys[i])){
+      if(keys[i] === 'tag'){keys[i] = 'tagName';}
+      if(key[keys[i]] === this[0].getAttribute(keys[i]) || key[keys[i]] === this[0][keys[i]]){
         res.push(keys[i]);
         if(!cb){
           break;
@@ -99,7 +111,8 @@ $.addMethod('hasAttr', function(key, value){
   if(keyType === 'array'){
     let res = [];
     for(let i in key){
-      if((value === undefined && this[0].hasAttribute(key[i])) || this[0].getAttribute(key[i]) === value){
+      if(key[i] === 'tag'){key[i] = 'tagName';}
+      if((value === undefined && (this[0].hasAttribute(key[i]) || this[0][key[i]])) || this[0].getAttribute(key[i]) === value || this[0][key[i]] === value){
         res.push(key[i]);
         if(!cb){
           break;
@@ -117,29 +130,34 @@ $.addMethod('hasAttr', function(key, value){
     }
     return res;
   }
-  if(cb && this[0].hasAttribute(key)){
+  if(key === 'tag'){key = 'tagName';}
+  if(cb && (this[0].hasAttribute(key) || this[0][key] !== undefined)){
     callFunc(cb, this, key);
     return this;
   }else if(cb){
     return this;
   }
   if(value === undefined){
-    return this[0].hasAttribute(key);
+    return this[0].hasAttribute(key) || this[0][key] !== undefined;
   }
-  return this[0].getAttribute(key) === value;
+  return this[0].getAttribute(key) === value || this[0][key] === value;
 });
 
-$.addMethod('removeAttr', function(key){
+$.addMethod('removeAttr', 'removeProp', function(key){
   if(Array.isArray(key)){
     for(let i in key){
+      if(key[i] === 'tag'){key[i] = 'tagName';}
       this.forEach(elm => {
         elm.removeAttribute(key[i]);
+        if(elm[key[i]] !== undefined){elm[key[i]] = undefined;}
       });
     }
     return this;
   }
+  if(key === 'tag'){key = 'tagName';}
   this.forEach(elm => {
     elm.removeAttribute(key);
+    if(elm[key] !== undefined){elm[key] = undefined;}
   });
   return this;
 });

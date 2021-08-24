@@ -181,7 +181,7 @@ $.addMethod = function(name, alias, cb){
   if(!Element.prototype[name]){
     Element.prototype[name] = cb;
     if(alias && !Element.prototype[alias]){
-      Element.prototype[alias] = function(){return this[name](...attributes);};
+      Element.prototype[alias] = function(){return this[name](...arguments);};
     }
     return true;
   }
