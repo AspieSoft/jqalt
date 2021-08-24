@@ -11,7 +11,7 @@ $.addMethod('ready', function(cb){
       if(elm === document || elm === window){
         cb.call(document);
       }else{
-        cb.call(this.cloneData(elm));
+        cb.call(fromElm(this, elm));
       }
     });
   }else{
@@ -30,7 +30,7 @@ $.addMethod('ready', function(cb){
         }
       }else{
         this.on('DOMContentLoaded', e => {
-          cb.call(this.cloneData(elm), e);
+          cb.call(fromElm(this, elm), e);
         });
       }
     });
