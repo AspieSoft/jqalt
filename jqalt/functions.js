@@ -254,6 +254,10 @@ function func(cb, args, end){
 }
 
 function callFunc(cb, thisArg){
+  if(thisArg instanceof Element && thisArg.data('jquery-support')){
+    thisArg = thisArg[0];
+  }
+
   const args = [...arguments];
   args.splice(0, 2);
   if(args.length){
@@ -307,6 +311,25 @@ function fixTypeStr(t){
 
 
 function fromElm(from, elm){
+  if(!elm && from.data('jquery-support')){
+    if(from instanceof Element){
+      return from[0];
+    }
+    return from;
+  }else if(!elm){
+    let e;
+    if(from instanceof Element){
+      e = from;
+    }
+    if(Array.isArray(elm)){
+      e = new Element(...from);
+    }
+    e = new Element(from);
+
+    e.dataStorage = from.dataStorage;
+    return e;
+  }
+
   let e;
   if(Array.isArray(elm)){
     e = new Element(...elm);
@@ -315,6 +338,10 @@ function fromElm(from, elm){
   }
 
   e.dataStorage = from.dataStorage;
+
+  if(from.data('jquery-support')){
+    return e[0];
+  }
   return e;
 }
 

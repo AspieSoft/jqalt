@@ -81,7 +81,7 @@ $.addMethod('parent', function(sel){
   //return new Element(this[0].parentNode);
 });
 
-$.addMethod('child', function(sel, index, node){
+$.addMethod('child', 'children', function(sel, index, node){
   [sel, index, node] = $.sort([sel, 'str', 'arr'], [index, 'num'], [node, 'bool']);
 
   let result = [];
@@ -123,11 +123,17 @@ $.addMethod('child', function(sel, index, node){
     }
   });
 
-  return new Element(...result);
+  const res = new Element(...result);
+
+  res.dataStorage = this.dataStorage;
+  return res;
 });
 
 $.addMethod('clone', function(deep = true){
-  return new Element(...this.map(elm => {
+  const res = new Element(...this.map(elm => {
     return elm.cloneNode(deep);
   }));
+
+  res.dataStorage = this.dataStorage;
+  return res;
 });

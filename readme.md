@@ -14,7 +14,7 @@ JQuery still has a nice syntax though, and the vanilla js `document.querySelecto
 
 ```html
 
-<script src="https://cdn.jsdelivr.net/gh/AspieSoft/jqalt@0.0.15/jqalt/index.js" type="module"></script>
+<script src="https://cdn.jsdelivr.net/gh/AspieSoft/jqalt@0.0.16/jqalt/index.js" type="module"></script>
 
 <!-- or load from jqalt.com (unsure if domain will be temporary) (currently a redirect) (surprised it was available) -->
 <script src="https://cdn.jqalt.com/index.js" type="module"></script>
@@ -23,6 +23,30 @@ JQuery still has a nice syntax though, and the vanilla js `document.querySelecto
 <!-- Note: for compatability with type="module", you may need to add the "defer" attribute (without quotes) to scripts that depend on jqAlt -->
 
 ```
+
+## JQuery Support
+
+Note: Vanilla jQuery support is currently in alpha, and still being tested.
+
+There are 2 ways to add jQuery Support
+
+### Method 1
+
+```javascript
+jqAlt.supportJquery();
+```
+
+This method globally adds the "jQuery" var as a reference to an isolated instance of this module with additional support for vanilla jQuery. Often in WordPress, you will see jQuery usage wrapped with a self calling function that passes the "jQuery" object. This makes it easy to replace all Vanilla jQuery instances with jqAlt, while still taking advantage of the unique features jqAlt has to offer.
+
+### Method 2
+
+```javascript
+const jQuery = jqAlt.jquery();
+```
+
+This is useful for other javascript modules that specifically want to add jqAlt support, along side jQuery support. This function will return an isolated instance of this module, with added jQuery support.
+
+Note: In jqAlt, callback functions like ".each" returns the "this" var as a jqAlt Element `$()`. On the other hand, jQuery returns the raw element Node. When jqAlt is using a jQuery supported instance of itself, it will return the first raw element Node to make up this difference `$()[0]`.
 
 ## Usage
 

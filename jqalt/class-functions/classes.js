@@ -115,6 +115,21 @@ $.addMethod('toggleClass', function(className, cb){
 });
 
 
+const colorProps = [
+  'color',
+  'background',
+];
+function fixColor(value, elm, prop){
+  if(!colorProps.includes(prop) && !prop.includes('color')){
+    return value;
+  }
+  if(!value || value === '' || !value.startsWith('rgb')){
+    return window.getComputedStyle(elm)[prop] || 'rgba(0, 0, 0, 0)';
+  }
+  return value;
+}
+
+
 $.addMethod('css', function(key, value){
   const keyType = varType(key);
 
@@ -144,7 +159,7 @@ $.addMethod('css', function(key, value){
       }
     }
     for(let i in key){
-      res[key[i]] = this[0].style[key[i]];
+      res[key[i]] = fixColor(this[0].style[key[i]], this[0], key[i]);
     }
     if(typeof value === 'function'){
       callFunc(value, this, res);
@@ -158,11 +173,11 @@ $.addMethod('css', function(key, value){
     });
     return this;
   }else if(typeof value === 'function'){
-    callFunc(value, this, this[0].style[key]);
+    callFunc(value, this, fixColor(this[0].style[key], this[0], key));
     return this;
   }
   if(value === undefined){
-    return this[0].style[key];
+    return fixColor(this[0].style[key], this[0], key);
   }
   this.forEach(elm => {
     elm.style[key] = value;

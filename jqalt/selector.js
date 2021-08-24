@@ -136,8 +136,27 @@ export default class Element extends Array {
 
 }
 
+
+const commonTagList = [
+  'head',
+  'body',
+  'header',
+  'main',
+  'footer'
+];
+
 function $(param, elm = document){
   if(param instanceof Element){return param;}
+
+  if(typeof param === 'string'){
+    if(param === ':root' && (elm === document || elm === window)){
+      return $.root();
+    }else if((elm === document || elm === window) && commonTagList.includes(param) && $[param]){
+      return $[param]();
+    }else if(param.startsWith(':') && commonTagList.includes(param.replace(/:/, ''))){
+      param = param.replace(/:/, '');
+    }
+  }
 
   if(param === 'head' && (elm === document || elm === window)){
     return new Element(document.head || document.getElementsByTagName('head')[0]);
@@ -188,6 +207,7 @@ $.addMethod = function(name, alias, cb){
   return false;
 };
 
+
 // add common tags
 let commonTags = {};
 function addCommonTag(tag){
@@ -200,10 +220,19 @@ function addCommonTag(tag){
     return elm;
   }
 }
-$.head = addCommonTag('head');
-$.body = addCommonTag('body');
-$.header = addCommonTag('header');
-$.main = addCommonTag('main');
-$.footer = addCommonTag('footer');
+
+for(const tag of commonTagList){
+  $[tag] = addCommonTag(tag);
+}
+
+$.root = function(){
+  if(commonTags[':root']){
+    return commonTags[':root'];
+  }
+  let elm = new Element(document.querySelectorAll(':root')[0]);
+  if(elm){commonTags[':root'] = elm;}
+  return elm;
+};
+
 
 export {$};

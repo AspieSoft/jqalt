@@ -93,7 +93,7 @@ $.addMethod('loop', function(ms, sel, cb, limit){
 });
 
 
-$.addMethod('on', function(event, sel, cb){
+$.addMethod('on', 'bind', function(event, sel, cb){
   if(typeof sel === 'function'){
     [sel, cb] = [cb, sel];
   }
