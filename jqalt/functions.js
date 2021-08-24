@@ -254,7 +254,7 @@ function func(cb, args, end){
 }
 
 function callFunc(cb, thisArg){
-  if(thisArg instanceof Element && thisArg.data('jquery-support')){
+  if(thisArg instanceof Element && thisArg.jQuery){
     thisArg = thisArg[0];
   }
 
@@ -311,7 +311,7 @@ function fixTypeStr(t){
 
 
 function fromElm(from, elm){
-  if(!elm && from.data('jquery-support')){
+  if(!elm && from.jQuery){
     if(from instanceof Element){
       return from[0];
     }
@@ -338,8 +338,9 @@ function fromElm(from, elm){
   }
 
   e.dataStorage = from.dataStorage;
+  e.jQuery = from.jQuery;
 
-  if(from.data('jquery-support')){
+  if(from.jQuery){
     return e[0];
   }
   return e;
@@ -408,6 +409,26 @@ function selectQuery(param, elm = document){
 }
 
 
+function isQuery(elm, sel){
+  if(typeof elm === 'string'){
+    [elm, sel] = [sel, elm];
+  }
+
+  if(Array.isArray(elm)){
+    return elm.map(e => $.isQuery(e));
+  }
+
+  //todo: create similar function to $.isQuery
+
+  return true || false;
+}
+
+
+function sortArgs(){
+  //todo: create similar function to $.sort
+}
+
+
 const ajaxContentTypes = {
   'json': 'application/json; charset=UTF-8',
   'text': 'text/plain; charset=UTF-8',
@@ -453,6 +474,8 @@ export {
   fromElm,
   getQuery,
   selectQuery,
+  isQuery,
+  sortArgs,
   fixTypeStr,
   ajaxContentTypes,
   getAjaxContentType,

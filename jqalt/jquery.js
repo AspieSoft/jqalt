@@ -2,7 +2,9 @@ import {$} from './selector.js'
 
 $.jquery = function(){
   const jq = function(param, elm = document){
-    return $(param, elm).data('jquery-support', true);
+    elm = $(param, elm);
+    elm.jQuery = true;
+    return elm;
   }
 
   //todo: add more jquery support

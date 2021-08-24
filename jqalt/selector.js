@@ -1,8 +1,9 @@
-import { buildHtmlElmArray, callFunc, varType, selectQuery } from './functions.js'
+import { buildHtmlElmArray, callFunc, varType, selectQuery, isQuery, sortArgs } from './functions.js'
 
 
 export default class Element extends Array {
   dataStorage = {};
+  jQuery = false;
 
   data(key, value){
     const keyType = varType(key);
@@ -193,6 +194,7 @@ function $(param, elm = document){
 
 $.del = new Date().getTime();
 
+
 $.addMethod = function(name, alias, cb){
   if(typeof alias === 'function'){
     [alias, cb] = [cb, alias];
@@ -206,6 +208,138 @@ $.addMethod = function(name, alias, cb){
   }
   return false;
 };
+
+
+//todo: slowly replace $.addMethod with $.method
+// making the add method function more advanced
+$.method = function(name, alias, cb){
+  if(typeof alias === 'function'){[alias, cb] = [cb, alias];}
+  if(Element.prototype[name]){return false;}
+  Element.prototype[name] = function(){
+
+    const args = arguments;
+
+    const thisArg = (sel, cb) => {
+      if(typeof sel === 'function'){
+        [sel, cb] = [cb, sel];
+      }
+
+      let res = this;
+      if(typeof sel === 'number'){
+        res = this[sel];
+      }else if(typeof sel === 'string'){
+        res = [];
+        for(let i = 0; i < sel.length; i++){
+          if(isQuery(this, sel)){
+            resArr.push(this[i]);
+          }
+        }
+      }else if(Array.isArray(sel)){
+        res = [];
+        let off = 0;
+        for(let i = 0; i < sel.length; i++){
+          if(typeof sel[i] === 'number'){
+            resArr.push(this[sel[i]]);
+            off++;
+          }else if(typeof sel[i] === 'string'){
+            if(isQuery(this, sel[i])){
+              resArr.push(this[i-off]);
+            }
+          }
+        }
+      }
+
+      if(typeof cb === 'function'){
+        if(Array.isArray(res)){
+          let r = [];
+          for(let i = 0; i < res.length; i++){
+            r.push(cb(res[i]));
+          }
+          return r;
+        }else{
+          return cb(res);
+        }
+      }
+
+      return res;
+    };
+
+    thisArg.from = (from, elm) => {
+      if(!elm){
+        elm = from;
+        from = this;
+      }
+
+      return fromElm(from, elm);
+    };
+
+    thisArg.sort = function(useOwnArgs){
+      const attrs = [...arguments];
+      if(useOwnArgs === true){
+        attrs.shift();
+        for(let i in args){
+          if(Array.isArray(attrs[i])){
+            attrs[i].unshift(args[i]);
+          }else{
+            attrs[i] = args[i];
+          }
+        }
+      }
+
+      return sortArgs(...attrs);
+    };
+
+    thisArg.isQuery = (elm, sel) => {
+      if(!sel){
+        sel = elm;
+        elm = this;
+      }
+
+      return isQuery(rlm, sel);
+    };
+
+    thisArg.func = (cb, thisArg) => {
+      if(typeof cb !== 'function'){
+        [cb, thisArg] = [thisArg, cb];
+      }
+
+      if(thisArg instanceof Element && thisArg.jQuery){
+        thisArg = thisArg[0];
+      }else if(thisArg instanceof Element || thisArg instanceof Node || thisArg instanceof NodeList){
+        if(thisArg instanceof Node){
+          thisArg = new Element(thisArg);
+        }else if(thisArg instanceof NodeList){
+          thisArg = new Element(...thisArg);
+        }
+        thisArg.dataStorage = this.dataStorage;
+        thisArg.jQuery = this.jQuery;
+      }
+
+      const args = [...arguments];
+      args.splice(0, 2);
+      if(args.length){
+        return function(){cb.call(thisArg, ...args, thisArg);}
+      }else{
+        return function(){cb.call(thisArg, thisArg);}
+      }
+    };
+
+    return cb.call(thisArg, ...arguments);
+  };
+
+  if(alias && Array.isArray(alias)){
+    for(let i in alias){
+      if(!Element.prototype[alias[i]]){
+        Element.prototype[alias[i]] = function(){return this[name](...arguments);};
+      }
+    }
+  }else if(alias && !Element.prototype[alias]){
+    Element.prototype[alias] = function(){return this[name](...arguments);};
+  }
+
+  return true;
+};
+
 
 
 // add common tags
