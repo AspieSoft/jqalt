@@ -261,65 +261,135 @@ $.addMethod('hide', function(){
 
 //todo: add animation function (may add somewhere else)
 
-$.addMethod('scrollTo', function(sel, target, ms, snap, cb){
-  //todo: organize option sorting better
+$.addMethod('scroll', function(sel, target, ms, snap, cb, cb2, method){
+  if(sel === undefined){
+    return {
+      x: (this[0].scrollLeft ?? this[0].pageXOffset ?? window.scrollX ?? $.body()[0].scrollLeft) || 0,
+      y: (this[0].scrollTop ?? this[0].pageYOffset ?? window.scrollY ?? $.body()[0].scrollTop) || 0,
+    };
+  }
+
   if(typeof sel !== 'string'){[sel, target] = [target, sel];}
-  if(typeof target === 'number'){[target, ms] = [ms, target];}
-  else if(typeof target === 'function'){[target, cb] = [cb, target];}
-  if(typeof target === 'number'){[target, snap] = [snap, target];}
-  else if(typeof target === 'function'){[target, cb] = [cb, target];}
-  if(typeof target === 'function'){[target, cb] = [cb, target];}
+  [sel, target, ms, snap, cb, cb2, method] = $.sort([sel, 'str', 'elm'], [target, 'obj', 'arr', 'num', 'str'], [ms, 'num'], [snap, 'num'], [cb, 'func'], [cb2, 'func'], [method, 'str'])
   if(!target){target = sel;}
-  if(!target){return this;}
+  if(!target && typeof cb !== 'function'){return this;}
   if(!ms){ms = 1000;}
   if(!snap){snap = 1;}else{snap = Math.abs(snap);}
 
-  let doc;
-  if(sel){
-    doc = $(sel)[0];
-  }else if(this[0] === document || this[0] === window){
-    doc = window;
-  }else{
-    doc = this[0];
+
+  if(typeof cb === 'function'){
+    this.on('scroll', sel, function(e){
+      if(this.data('js-triggered-scroll')){
+        return;
+      }
+      let scroll = {
+        x: (e.target.scrollLeft ?? e.target.pageXOffset ?? window.scrollX ?? $.body()[0].scrollLeft) || 0,
+        y: (e.target.scrollTop ?? e.target.pageYOffset ?? window.scrollY ?? $.body()[0].scrollTop) || 0,
+      };
+      let res = callFunc(cb, this, e, scroll);
+      if(res !== undefined){
+        this.data('js-triggered-scroll', true);
+        res.done = () => {this.data('js-triggered-scroll', false);};
+        this.scroll(res);
+      }
+    }, {passive: false});
   }
 
-  const targetType = varType(target);
-  if(targetType === 'array'){
-    target = {x: target[0], y: target[1]};
-    targetType = 'object';
-  }else if(targetType === 'number'){
-    target = {x: null, y: targetType};
-    targetType = 'object';
-  }
+  if(target){
+    function handleTarget(doc){
+      let targetType = varType(target);
+      if(targetType === 'array'){
+        target = {x: target[0], y: target[1]};
 
-  if(targetType === 'string'){
-    target = $(target)[0];
-    target = {
-      x: (target.scrollLeft ?? doc.pageXOffset ?? $.body[0].scrollLeft) || 0,
-      y: (target.scrollTop ?? doc.pageYOffset ?? $.body[0].scrollTop) || 0,
-    };
-    targetType = 'object';
-  }
+        if(target[2]){ms = target[2];}
+        if(target[3]){snap = target[3];}
+        if(target[4]){cb2 = target[4];}
 
-  if(targetType !== 'object'){
-    if(doc === this[0] || this[0] === document || this[0] === window){
-      return this;
+        targetType = 'object';
+      }else if(targetType === 'number'){
+        target = {x: null, y: targetType};
+        targetType = 'object';
+      }
+
+      if(targetType === 'string'){
+        let targetElm = $(target);
+
+        if(targetElm.length === 1){
+          target = {
+            x: (targetElm[0]?.scrollLeft ?? doc[0]?.pageXOffset ?? window.scrollX ?? $.body()[0].scrollLeft) || 0,
+            y: (targetElm[0]?.scrollTop ?? doc[0]?.pageYOffset ?? window.scrollY ?? $.body()[0].scrollTop) || 0,
+          };
+          targetType = 'object';
+        }else{
+          target = [];
+          for(let i in targetElm){
+            target[i] = {
+              x: (targetElm[i]?.scrollLeft ?? doc[0]?.pageXOffset ?? window.scrollX ?? $.body()[0].scrollLeft) || 0,
+              y: (targetElm[i]?.scrollTop ?? doc[0]?.pageYOffset ?? window.scrollY ?? $.body()[0].scrollTop) || 0,
+            };
+          }
+          targetType = 'array';
+        }
+      }
+
+      if(targetType !== 'object' && targetType !== 'array' && !(doc[0] === this[0] || this[0] === document || this[0] === window)){
+        let targetRect = target.getBoundingClientRect();
+        target = {
+          x: targetRect.left,
+          y: targetRect.top,
+        };
+      }
+
+      if(targetType === 'object'){
+        if(targetType.ms){ms = targetType.ms;}
+        if(targetType.snap){snap = targetType.snap;}
+        if(targetType.cb){cb2 = targetType.cb;}
+        if(targetType.method){method = targetType.method;}
+      }
+
+      let start = {
+        x: (doc[0]?.scrollLeft ?? doc[0]?.pageXOffset ?? window.scrollX ?? $.body()[0].scrollLeft) || 0,
+        y: (doc[0]?.scrollTop ?? doc[0]?.pageYOffset ?? window.scrollY ?? $.body()[0].scrollTop) || 0,
+      };
+
+      if(targetType === 'array'){
+        target.forEach(tar => {
+          if(tar.x === undefined || tar.x === null){tar.x = start.x;}
+          if(tar.y === undefined || tar.y === null){tar.y = start.y;}
+
+          
+          runAnim(start, tar, ms, snap, res => {
+            doc[0].scrollTo(res.x, res.y);
+          }, cb2);
+        });
+      }
+
+      if(targetType === 'object'){
+        if(target.x === undefined || target.x === null){target.x = start.x;}
+        if(target.y === undefined || target.y === null){target.y = start.y;}
+
+        runAnim(start, target, ms, snap, res => {
+          doc[0].scrollTo(res.x, res.y);
+        }, cb2);
+      }
     }
-    let targetRect = target.getBoundingClientRect();
-    target = {
-      x: targetRect.left,
-      y: targetRect.top,
-    };
+
+    this.each(function(){
+      if(sel){
+        $(sel, this).each(handleTarget);
+      }else if(this[0] === document || this[0] === window){
+        handleTarget(fromElm(this, window));
+      }else{
+        handleTarget(this);
+      }
+    });
   }
 
-  let start = {
-    x: (doc.scrollLeft ?? doc.pageXOffset ?? $.body[0].scrollLeft) || 0,
-    y: (doc.scrollTop ?? doc.pageYOffset ?? $.body[0].scrollTop) || 0,
-  };
+  return this;
+});
 
-  if(target.x === undefined || target.x === null){target.x = start.x;}
-  if(target.y === undefined || target.y === null){target.y = start.y;}
 
+function runAnim(start, target, ms, snap, cb, cb2, method = 'ease'){
   let dist = {
     x: target.x - start.x,
     y: target.y - start.y,
@@ -335,37 +405,47 @@ $.addMethod('scrollTo', function(sel, target, ms, snap, cb){
     if(dist.x < snap && dist.x > -snap){
       res.x = target.x;
     }else{
-      res.x = ease(timeE, start.x, dist.x, ms);
+      res.x = anim_method(timeE, start.x, dist.x, ms, method);
     }
 
     if(dist.y < snap && dist.y > -snap){
       res.y = target.y;
     }else{
-      //todo: add option to select ease type
-      res.y = anim_ease(timeE, start.y, dist.y, ms);
+      res.y = anim_method(timeE, start.y, dist.y, ms, method);
     }
 
-    window.scrollTo(res.x, res.y);
+    cb(res);
 
     if(timeE < ms){
       requestAnimationFrame(anim);
     }else{
-      window.scrollTo(target.x, target.y);
-      if(typeof cb === 'function'){
-        callFunc(cb, fromElm(this, this[0]), {x: target.x, y: target.y, time: timeE});
+      cb(target);
+      //todo: fix cb2 undefined
+      if(typeof cb2 === 'function'){
+        callFunc(cb2, fromElm(this, this[0]), {x: target.x, y: target.y, time: timeE});
+      }
+      if(typeof target.done === 'function'){
+        target.done();
       }
     }
   }
 
   requestAnimationFrame(anim);
+}
 
-  return this;
-});
 
-$.addMethod('scroll', function(){
-  //todo: scroll by number for duration OR return scroll position as object {x, y}
-});
-
+function anim_method(t, b, c, d, m){
+  switch(m){
+    case 'ease':
+      return anim_ease(t, b, c, d);
+    case 'ease-in':
+      return anim_ease_in(t, b, c, d);
+    case 'ease-out':
+      return anim_ease_out(t, b, c, d);
+    default:
+      return anim_ease(t, b, c, d);
+  }
+}
 
 function anim_ease_in(t, b, c, d){
   t /= d;
