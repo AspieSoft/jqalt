@@ -320,11 +320,11 @@ function fromElm(from, elm){
     let e;
     if(from instanceof Element){
       e = from;
-    }else if(Array.isArray(from)){
-      e = new Element(...from);
-    }else{
-      e = new Element(from);
     }
+    if(Array.isArray(elm)){
+      e = new Element(...from);
+    }
+    e = new Element(from);
 
     e.dataStorage = from.dataStorage;
     return e;
@@ -415,7 +415,7 @@ function isQuery(elm, sel){
   }
 
   if(Array.isArray(elm)){
-    return elm.map(e => isQuery(e));
+    return elm.map(e => $.isQuery(e));
   }
 
   //todo: create similar function to $.isQuery

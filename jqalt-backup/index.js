@@ -1,7 +1,6 @@
 import {$} from './selector.js'
 import './jquery.js'
 import './socket-io.js'
-import './method.js'
 import './common.js'
 import './class-functions/all.js'
 

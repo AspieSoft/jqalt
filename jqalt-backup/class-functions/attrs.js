@@ -2,7 +2,7 @@ import { elementUrlTagTypes, callFunc, varType, fromElm } from '../functions.js'
 import {$} from '../selector.js'
 
 
-/*$.addMethod('attr', 'prop', function(key, value){
+$.addMethod('attr', 'prop', function(key, value){
   const keyType = varType(key);
 
   if(keyType === 'function'){
@@ -66,95 +66,6 @@ import {$} from '../selector.js'
     elm.setAttribute(key, value);
   });
   return this;
-});*/
-$.method(['attr', 'prop'], function(key, value){
-  const keyType = varType(key);
-
-  if(keyType === 'function'){
-    this.func(key, this, this(0, 'args'))();
-    return this();
-  }else if(key === undefined){
-    return this(0, 'args');
-  }
-
-  if(keyType === 'object'){
-    let keys = Object.keys(key);
-    for(let i in keys){
-      if(keys[i] === 'tag'){keys[i] = 'tagName';}
-      this(elm => {
-        elm.setAttribute(keys[i], key[keys[i]]);
-        if(elm[keys[i]] !== undefined){elm[keys[i]] = key[keys[i]];}
-      });
-    }
-    return this();
-  }
-  if(keyType === 'array'){
-    let res = {};
-    if(value === $.del){
-      for(let i in key){
-        if(key[i] === 'tag'){key[i] = 'tagName';}
-        
-        this(elm => {
-          elm.removeAttribute(key[i]);
-          if(elm[key[i]] !== undefined){elm[key[i]] = undefined;}
-        });
-      }
-    }
-    for(let i in key){
-      if(key[i] === 'tag'){key[i] = 'tagName';}
-      if(this.jquery && this.method === 'prop'){
-        res[key[i]] = this(0, key[i]);
-      }else if(this.jquery){
-        res[key[i]] = this(0).getAttribute(key[i]);
-      }else{
-        res[key[i]] = (this(0).getAttribute(key[i]) || this(0, key[i]));
-      }
-    }
-    if(typeof value === 'function'){
-      this.func(value, this, res)();
-      return this();
-    }
-    return res;
-  }
-  if(key === 'tag'){key = 'tagName';}
-  if(value === $.del){
-    this(elm => {
-      elm.removeAttribute(key);
-      if(elm[key] !== undefined){elm[key] = undefined;}
-    });
-    return this();
-  }else if(typeof value === 'function'){
-    if(this.jquery && this.method === 'prop'){
-      this.call(value, this, this(0, key));
-    }else if(this.jquery){
-      this.call(value, this, this(0).getAttribute(key));
-    }else{
-      this.call(value, this, (this(0).getAttribute(key) || this(0, key)));
-    }
-    return this;
-  }
-  if(value === undefined){
-    if(this.jquery && this.method === 'prop'){
-      return this(0, key);
-    }else if(this.jquery){
-      return this(0).getAttribute(key);
-    }else{
-      return (this(0).getAttribute(key) || this(0, key));
-    }
-  }
-  if(key === 'tagName' && !this.jquery){
-    this().tag(value);
-    return this();
-  }
-
-  this(elm => {
-    if(elm[key]){
-      elm[key] = value;
-    }else if(!this.jquery || this.method !== 'prop'){
-      elm.setAttribute(key, value);
-    }
-  });
-  return this();
 });
 
 $.addMethod('hasAttr', 'hasProp', function(key, value){
@@ -250,7 +161,6 @@ $.addMethod('removeAttr', 'removeProp', function(key){
   });
   return this;
 });
-
 
 
 $.addMethod('tag', function(value){

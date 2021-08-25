@@ -6,6 +6,4 @@
 
   $('.main-content').append(elm, h1);
 
-  $('.main-content').tag('main');
-
 });

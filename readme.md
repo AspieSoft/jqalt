@@ -14,7 +14,7 @@ JQuery still has a nice syntax though, and the vanilla js `document.querySelecto
 
 ```html
 
-<script src="https://cdn.jsdelivr.net/gh/AspieSoft/jqalt@0.0.17/jqalt/index.js" type="module"></script>
+<script src="https://cdn.jsdelivr.net/gh/AspieSoft/jqalt@0.0.18/jqalt/index.js" type="module"></script>
 
 <!-- or load from jqalt.com (unsure if domain will be temporary) (currently a redirect) (surprised it was available) -->
 <script src="https://cdn.jqalt.com/index.js" type="module"></script>
@@ -133,6 +133,129 @@ $.isQuery(elm, sel) // returns true if the element matches a querySelector (does
 
 
 $.isArrowFunction(func) // returns true if the var passed is an arrow function "() => {}"
+
+```
+
+## Creating Plugins
+
+If you want to build a plugin to expand this modules functionality, theres an easy method also used by the core module.
+
+```javascript
+
+let success = $.method('name', function(arg1, arg2){
+  // callback
+});
+
+// usage
+$('sel').name(arg1, arg2);
+
+console.log(success); // false if the "name" method already exists (preventing method overrides for security)
+// will return an array if successful
+
+
+// if you need to give your method an alias to support other libraries like jQuery
+let success = $.method(['name', 'alias1', 'alias2'], function(){
+  // get the method or alias name
+  this.method === 'name' || 'alias1' || 'alias2'
+
+  this.jquery // true if this method needs to support the vanilla jQuery syntax by user request
+});
+
+console.log(success); // example output: [true, undefined, true] // if alias1 already exists
+
+
+// getting the query element
+$.method('name', function(){
+
+  this() // returns this query element
+
+  this(0) // returns the first element (same as this()[0])
+
+  this('sel') // returns all elements that match the selector
+
+  this(elm => {
+    // a for loop for every element (runs more like .map)
+    // uses the basic for(i){} loop to take advantage of the browsers optimized performance
+  });
+
+  this(0, 'prop') // returns a property from the first element
+
+  this(0, 'args' || 'atts' || 'attrs') // an alias for the attributes property
+
+});
+
+
+
+// you can also auto sort the function arguments based on var type, or do this manually
+$.method('name', ['string', 'element', 'function'], function(str, elm, cb){
+  // optional manual way
+  [str, elm, cb] = this.sort(
+    [str, 'string'],
+    [elm, 'element'], // this modules $() selector
+    [cb, 'function', 'regex', 'obj', 'object'], // you can pass multiple types, and use common abriviasions
+  );
+});
+
+// in some cases, you may need the sorting to be less strict
+// be default, if a match is found, but the element that goes there is also a match, it will be ignored
+// you can override this functionality easily, by passing "false" (without quotes as a boolean) in the array
+
+// without low priority
+this.sort(
+  [sel, 'str'],
+  [str, 'str'],
+  [bool, 'bool'],
+)
+(true, 'div', 'test') // {sel: 'test', str: 'div', bool: true}
+
+// with low priority
+this.sort(
+  [sel, 'str'],
+  [str, 'str', false],
+  [bool, 'bool'],
+)
+(true, 'div', 'test') // {sel: 'div', str: 'test', bool: true}
+// 'div' will be hoisted to check the sel slot first
+
+// or to make everything low priority
+this.sort(false,
+  [sel, 'str'],
+  [str, 'str'],
+  [bool, 'bool'],
+) // {sel: 'div', str: 'test', bool: true}
+
+
+
+// returning a new query element
+this.from(newElm)
+// this function ensures the new element is passed with the same dataStorage and jQuery support status of the original element
+// it also ensures your passing this modules query element, and not a default JavaScript Node element
+
+
+// calling a function
+cb = this.func(cb, thisArg, ...moreArgs) // prepare the function (adds support for jQuery syntax)
+cb(justOneMoreArg); // run the callback function (you can add additional args if needed)
+// the thisArg is also put on the end for arrow function support () => {}
+
+// to put your additional args in front of the current ones
+cb = this.func(cb, true, thisArg, ...args)
+cb(...newArgs) // .call(thisArg, ...newArgs, ...args, thisArg)
+
+// to use a new thisArg instead
+cb = this.func(cb, null, ...args)
+cb(thisArg, ...newArgs) // .call(thisArg, ...args, ...moreArgs, thisArg)
+
+
+// geting a var type
+this.type(var) // returns the typeof, after checking for 'array', 'element', 'node', 'nodelist', etc...
+
+this.type(var, 'str') // checks if var is a string (accepts some common abbreviations, same abbreviations as this.sort)
+
+
+// resolve the "this" arg, and get the Element out of it if possible, or return the original variable
+this.resolve(this) // returns this()
+this.resolve(this()) // returns this() (the same expected output as above)
+this.resolve('string') // returns 'string'
 
 ```
 
