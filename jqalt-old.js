@@ -1,210 +1,962 @@
 ;$ = (function(){
 
+
+  const elementUrlTagTypes = {
+    src: [
+      'iframe',
+      'img',
+      'script',
+      'frame',
+      'embed',
+      'source',
+      'input',
+      'audio',
+      'track',
+      'video',
+    ],
+    href: [
+      'link',
+      'a',
+      'area',
+      'base',
+      'image',
+    ],
+    other: {
+      'applet': 'codebase',
+      'blockquote': 'cite',
+      'body': 'background',
+      'del': 'cite',
+      'form': 'action',
+      'head': 'profile',
+      'ins': 'cite',
+      'object': 'data',
+      'q': 'cite',
+      'button': 'formaction',
+      'command': 'icon',
+      'html': 'manifest',
+    }
+  };
+
+
+  function buildHtmlElmArray(param){
+    let tags = [];
+    let level = [];
+    param = param.replace(/%!|!%/g, function(s){
+      if(s === '%!'){
+        return '%!-!%';
+      }return '%!!%';
+    }).replace(/<(\/|)([\w_\-$\.]+)((?:\s+[\w_\-$\.]+\s*=\s*(["'])(?:\\[\\"']|.)*?\3)*)(\/|)>/g, function(_, start, tag, attrs, q, end){
+      if(attrs && attrs !== ''){
+        attrs = attrs.split(/(\s+[\w_\-$\.]+\s*=\s*(?:"(?:\\[\\"']|.)*?"|'(?:\\[\\"']|.)*?'))/g);
+        let attrList = {};
+        for(let i = 0; i < attrs.length; i++){
+          if(attrs[i].trim() !== ''){
+            let attr = attrs[i].split(/=(.*)/);
+            attrList[attr[0]] = attr[1].replace(/^["'](.*)["']$/, '$1');
+          }
+        }
+        attrs = attrList;
+      }else{attrs = {};}
+      if(end !== ''){
+        return `%!t:${tags.push({tag, attrs})-1}!%`;
+      }else if(start !== ''){
+        let lev = [...level];
+        let oldTag = lev.pop();
+        while(oldTag !== tag && lev.length > 0){
+          oldTag = lev.pop();
+        }
+        if(oldTag !== tag){
+          return '';
+        }
+        level = [...lev];
+        return `%!x:${tags.push({tag, attrs})-1}:${level.length}!%`;
+      }else{
+        return `%!x:${tags.push({tag, attrs})-1}:${level.push(tag)-1}!%`;
+      }
+    });
+
+    function getTag(param){
+      const list = [];
+      param = param.replace(/%!x:([0-9]+):([0-9]+)!%(.*?)%!x:[0-9]+:\2!%/gs, function(_, i1, l1, c){
+        let {tag, attrs} = tags[i1];
+        let aKey = Object.keys(attrs);
+        for(let i = 0; i < aKey.length; i++){
+          let k = aKey[i].replace(/%!(-|)!%/g, function(_, n){
+            if(n === '-'){
+              return '%!';
+            }return '!%';
+          });
+          let v = attrs[aKey[i]].replace(/%!(-|)!%/g, function(_, n){
+            if(n === '-'){
+              return '%!';
+            }return '!%';
+          });
+          attrs[k] = v;
+        }
+        let cont = getTag(c);
+        return `%!${list.push({tag, attrs, cont})-1}!%`;
+      }).replace(/%![xt]:([0-9]+)(?::[0-9]+|)!%/gs, function(_, i){
+        return `%!${list.push(tags[i])-1}!%`;
+      });
+
+      param = param.split(/(%![0-9]+!%)/g).map(p => {
+        if(p.match(/^%![0-9]+!%$/)){
+          return list[Number(p.replace(/^%!([0-9]+)!%$/, '$1'))];
+        }
+        return p;
+      });
+
+      return param;
+    }
+
+    param = getTag(param);
+
+    function buildHtmlStr(cont){
+      let res = '';
+      for(let i = 0; i < cont.length; i++){
+        if(typeof cont[i] === 'object'){
+          let html = '<'+cont[i].tag;
+          const keys = Object.keys(cont[i].attrs);
+          for(let j = 0; j < keys.length; j++){
+            html += ` ${keys[j]}="${cont[i].attrs[keys[j]]}"`;
+          }
+          if(!cont[i].cont){
+            html += '/>';
+          }else{
+            html += `>${buildHtmlStr(cont[i].cont)}</${cont[i].tag}>`;
+          }
+          res += html;
+        }else{
+          res += cont[i];
+        }
+      }
+      return res;
+    }
+
+    const elmList = [];
+    for(let i = 0; i < param.length; i++){
+      if(typeof param[i] === 'object'){
+        let elm = document.createElement(param[i].tag);
+        const keys = Object.keys(param[i].attrs);
+        for(let j = 0; j < keys.length; j++){
+          if(keys[j].trim() === 'class'){
+            let classes = param[i].attrs[keys[j]].split(' ').filter(c => c.trim() !== '');
+            for(let i in classes){
+              elm.classList.add(classes[i]);
+            }
+          }else{
+            elm[keys[j].trim()] = param[i].attrs[keys[j]];
+          }
+        }
+        if(param[i].cont){
+          elm.innerHTML = buildHtmlStr(param[i].cont);
+        }
+        elmList.push(elm);
+      }else if(param[i].trim() !== ''){
+        let elm = document.createElement('p');
+        elm.textContent = param[i];
+        elmList.push(elm);
+      }
+    }
+
+    return elmList;
+  }
+
+  function func(cb, args, end){
+    if(!cb.toString().startsWith('f')){
+      // arrow function
+      if(Array.isArray(args)){
+        const first = args.shift();
+        const addArgs = [...args];
+        if(first === undefined){
+          // pre arg without first
+          return {call: function(){
+            const addArgs = [...args];
+            let f = arguments[0];
+            let argIndex = 0;
+            for(let i = 1; i < arguments.length; i++){
+              while(addArgs[argIndex] !== undefined){
+                argIndex++;
+              }
+              addArgs[argIndex] = arguments[i];
+            }
+            if(end){
+              cb(...addArgs, f);
+            }else{
+              cb(f, ...addArgs);
+            }
+          }};
+        }
+        // pre arg with first
+        return {call: function(){
+          const addArgs = [...args];
+          let argIndex = 0;
+          for(let i = 0; i < arguments.length; i++){
+            while(addArgs[argIndex] !== undefined){
+              argIndex++;
+            }
+            addArgs[argIndex] = arguments[i];
+          }
+          if(end){
+            cb(...addArgs, first);
+          }else{
+            cb(first, ...addArgs);
+          }
+        }};
+      }
+      // no pre args
+      if(end){
+        return {call: function(){
+          let a = arguments;
+          let f = a.shift();
+          cb(...a, f);
+        }};
+      }
+      return {call: function(){
+        cb(...arguments);
+      }};
+    }
+    // normal function
+    if(Array.isArray(args)){
+      const first = args.shift();
+      if(first === undefined){
+        // pre arg without first
+        return {call: function(){
+          const addArgs = [...args];
+          let f = arguments[0];
+          let argIndex = 0;
+          for(let i = 1; i < arguments.length; i++){
+            while(addArgs[argIndex] !== undefined){
+              argIndex++;
+            }
+            addArgs[argIndex] = arguments[i];
+          }
+          cb.call(f, ...addArgs);
+        }};
+      }
+      // pre arg with first
+      return {call: function(){
+        const addArgs = [...args];
+        let argIndex = 0;
+        for(let i = 0; i < arguments.length; i++){
+          while(addArgs[argIndex] !== undefined){
+            argIndex++;
+          }
+          addArgs[argIndex] = arguments[i];
+        }
+        cb.call(first, ...addArgs);
+      }};
+    }
+    // no pre args
+    return {call: function(){
+      cb.call(...arguments);
+    }};
+  }
+
+  function callFunc(cb, thisArg){
+    const args = [...arguments];
+    args.splice(0, 2);
+    if(args.length){
+      return cb.call(thisArg, ...args, thisArg);
+    }else{
+      return cb.call(thisArg, thisArg);
+    }
+  }
+
+  function varType(value){
+    if(Array.isArray(value)){
+      return 'array';
+    }else if(Number.isNaN(value)){
+      return 'nan';
+    }else if(value === null){
+      return 'null';
+    }else if(value instanceof RegExp){
+      return 'regex';
+    }
+    return typeof value;
+  }
+
+  function fromElm(from, elm){
+    let e;
+    if(Array.isArray(elm)){
+      e = new Element(...elm);
+    }else{
+      e = new Element(elm);
+    }
+
+    e.dataStorage = from.dataStorage;
+    return e;
+  }
+
   class Element extends Array {
     dataStorage = {};
 
     data(key, value){
-      if(typeof key === 'object'){
-        const k = Object.keys(key);
-        for(let i = 0; i < k.length; i++){
-          this.dataStorage[k[i]] = key[k[i]];
+      const keyType = varType(key);
+
+      if(keyType === 'function'){
+        callFunc(key, this, this.dataStorage);
+        return this;
+      }else if(key === undefined){
+        return this.dataStorage;
+      }
+
+      if(keyType === 'object'){
+        let keys = Object.keys(key);
+        for(let i in keys){
+          this.dataStorage[keys[i]] = key[keys[i]];
         }
-      }else if(value !== undefined && value != null){
-        this.dataStorage[key] = value;
-      }else{
+        return this;
+      }
+      if(keyType === 'array'){
+        let res = {};
+        if(value === $.del){
+          for(let i in key){
+            delete this.dataStorage[key[i]];
+          }
+        }
+        for(let i in key){
+          res[key[i]] = this.dataStorage[key[i]];
+        }
+        if(typeof value === 'function'){
+          callFunc(value, this, res);
+          return this;
+        }
+        return res;
+      }
+      if(value === $.del){
+        delete this.dataStorage[key];
+        return this;
+      }else if(typeof value === 'function'){
+        callFunc(value, this, this.dataStorage[key]);
+        return this;
+      }
+      if(value === undefined){
         return this.dataStorage[key];
       }
+      this.dataStorage[key] = value;
       return this;
+    }
+
+    hasData(key, value){
+      const keyType = varType(key);
+      let cb;
+      if(typeof value === 'function'){
+        cb = value;
+        value = undefined;
+      }
+      if(keyType === 'object'){
+        let res = [];
+        let keys = Object.keys(key);
+        for(let i in keys){
+          if(key[keys[i]] === this.dataStorage[keys[i]]){
+            res.push(keys[i]);
+            if(!cb){
+              break;
+            }
+          }
+        }
+        if(value === false){
+          res = !res;
+        }else if(cb && res.length){
+          callFunc(cb, this, res);
+          return this;
+        }else if(cb){
+          return this;
+        }
+        if(!res.length){
+          return false;
+        }
+        return res;
+      }
+      if(keyType === 'array'){
+        let res = [];
+        for(let i in key){
+          if((value === undefined && this.dataStorage[key[i]] !== undefined) || this.dataStorage[key[i]] === value){
+            res.push(key[i]);
+            if(!cb){
+              break;
+            }
+          }
+        }
+        if(cb && res){
+          callFunc(cb, this, res);
+          return this;
+        }else if(cb){
+          return this;
+        }
+        if(!res.length){
+          return false;
+        }
+        return res;
+      }
+      if(cb && this.dataStorage[key] !== undefined){
+        callFunc(cb, this, key);
+        return this;
+      }else if(cb){
+        return this;
+      }
+      if(value === undefined){
+        return this.dataStorage[key] !== undefined;
+      }
+      return this.dataStorage[key] === value;
     }
 
     removeData(key){
       if(Array.isArray(key)){
-        key.forEach(k => {
-          delete this.dataStorage[k];
+        for(let i in key){
+          delete this.dataStorage[key[i]];
+        }
+        return this;
+      }
+      delete this.dataStorage[key];
+      return this;
+    }
+
+
+    attr(key, value){
+      const keyType = varType(key);
+
+      if(keyType === 'function'){
+        callFunc(key, this, this[0].attributes);
+        return this;
+      }else if(key === undefined){
+        return this[0].attributes;
+      }
+
+      if(keyType === 'object'){
+        let keys = Object.keys(key);
+        for(let i in keys){
+          this.forEach(elm => {
+            elm.setAttribute(keys[i], key[keys[i]]);
+          });
+        }
+        return this;
+      }
+      if(keyType === 'array'){
+        let res = {};
+        if(value === $.del){
+          for(let i in key){
+            this.forEach(elm => {
+              elm.removeAttribute(key[i]);
+            });
+          }
+        }
+        for(let i in key){
+          res[key[i]] = this[0].getAttribute(key[i]);
+        }
+        if(typeof value === 'function'){
+          callFunc(value, this, res);
+          return this;
+        }
+        return res;
+      }
+      if(value === $.del){
+        this.forEach(elm => {
+          elm.removeAttribute(key);
+        });
+        return this;
+      }else if(typeof value === 'function'){
+        callFunc(value, this, this[0].getAttribute(key));
+        return this;
+      }
+      if(value === undefined){
+        return this[0].getAttribute(key);
+      }
+      this.forEach(elm => {
+        elm.setAttribute(key, value);
+      });
+      return this;
+    }
+
+    hasAttr(key, value){
+      const keyType = varType(key);
+      let cb;
+      if(typeof value === 'function'){
+        cb = value;
+        value = undefined;
+      }
+
+      if(!this.length){
+        if(cb){
+          return this;
+        }
+        return undefined;
+      }
+
+      if(keyType === 'object'){
+        let res = [];
+        let keys = Object.keys(key);
+        for(let i in keys){
+          if(key[keys[i]] === this[0].getAttribute(keys[i])){
+            res.push(keys[i]);
+            if(!cb){
+              break;
+            }
+          }
+        }
+        if(value === false){
+          res = !res;
+        }else if(cb && res.length){
+          callFunc(cb, this, res);
+          return this;
+        }else if(cb){
+          return this;
+        }
+        if(!res.length){
+          return false;
+        }
+        return res;
+      }
+      if(keyType === 'array'){
+        let res = [];
+        for(let i in key){
+          if((value === undefined && this[0].hasAttribute(key[i])) || this[0].getAttribute(key[i]) === value){
+            res.push(key[i]);
+            if(!cb){
+              break;
+            }
+          }
+        }
+        if(cb && res){
+          callFunc(cb, this, res);
+          return this;
+        }else if(cb){
+          return this;
+        }
+        if(!res.length){
+          return false;
+        }
+        return res;
+      }
+      if(cb && this[0].hasAttribute(key)){
+        callFunc(cb, this, key);
+        return this;
+      }else if(cb){
+        return this;
+      }
+      if(value === undefined){
+        return this[0].hasAttribute(key);
+      }
+      return this[0].getAttribute(key) === value;
+    }
+
+    removeAttr(key){
+      if(Array.isArray(key)){
+        for(let i in key){
+          this.forEach(elm => {
+            elm.removeAttribute(key[i]);
+          });
+        }
+        return this;
+      }
+      this.forEach(elm => {
+        elm.removeAttribute(key);
+      });
+      return this;
+    }
+
+
+    addClass(className){
+      if(className.includes(' ')){className = className.split(' ').filter(c => c.trim() !== '');}
+      if(Array.isArray(className)){
+        for(let i in className){
+          this.forEach(elm => {
+            elm.classList.add(className[i]);
+          });
+        }
+        return this;
+      }
+      if(arguments.length > 1){
+        for(let i in arguments){
+          this.forEach(elm => {
+            elm.classList.add(arguments[i]);
+          });
+        }
+        return this;
+      }
+      this.forEach(elm => {
+        elm.classList.add(className);
+      });
+      return this;
+    }
+
+    hasClass(className, cb){
+      if(className.includes(' ')){className = className.split(' ').filter(c => c.trim() !== '');}
+      if(Array.isArray(className)){
+        let res = [];
+        for(let i in className){
+          if(this[0].classList.contains(className[i])){
+            res.push(className[i]);
+          }
+        }
+        if(typeof cb === 'function' && res.length !== 0){
+          callFunc(cb, this, res);
+          return this;
+        }else if(cb){
+          return this;
+        }
+        if(!res.length){
+          return false;
+        }
+        return res;
+      }
+      if(arguments.length > 1){
+        let res = [];
+        for(let i in arguments){
+          if(this[0].classList.contains(arguments[i])){
+            res.push(arguments[i]);
+          }
+        }
+        if(typeof cb === 'function' && res.length !== 0){
+          callFunc(cb, this, res);
+          return this;
+        }else if(cb){
+          return this;
+        }
+        if(!res.length){
+          return false;
+        }
+        return res;
+      }
+      return this[0].classList.contains(className);
+    }
+
+    removeClass(className){
+      if(className.includes(' ')){className = className.split(' ').filter(c => c.trim() !== '');}
+      if(Array.isArray(className)){
+        for(let i in className){
+          this.forEach(elm => {
+            elm.classList.remove(className[i]);
+          });
+        }
+        return this;
+      }
+      if(arguments.length > 1){
+        for(let i in arguments){
+          this.forEach(elm => {
+            elm.classList.remove(arguments[i]);
+          });
+        }
+        return this;
+      }
+      this.forEach(elm => {
+        elm.classList.remove(className);
+      });
+      return this;
+    }
+
+
+    css(key, value){
+      const keyType = varType(key);
+
+      if(keyType === 'function'){
+        callFunc(key, this, this[0].style);
+        return this;
+      }else if(key === undefined){
+        return this[0].style;
+      }
+
+      if(keyType === 'object'){
+        let keys = Object.keys(key);
+        for(let i in keys){
+          this.forEach(elm => {
+            elm.style[keys[i]] = key[keys[i]];
+          });
+        }
+        return this;
+      }
+      if(keyType === 'array'){
+        let res = {};
+        if(value === '' || value === $.del){
+          for(let i in key){
+            this.forEach(elm => {
+              elm.style[key[i]] = '';
+            });
+          }
+        }
+        for(let i in key){
+          res[key[i]] = this[0].style[key[i]];
+        }
+        if(typeof value === 'function'){
+          callFunc(value, this, res);
+          return this;
+        }
+        return res;
+      }
+      if(value === '' || value === $.del){
+        this.forEach(elm => {
+          elm.style[key] = '';
+        });
+        return this;
+      }else if(typeof value === 'function'){
+        callFunc(value, this, this[0].style[key]);
+        return this;
+      }
+      if(value === undefined){
+        return this[0].style[key];
+      }
+      this.forEach(elm => {
+        elm.style[key] = value;
+      });
+      return this;
+    }
+
+    html(value){
+      if(typeof value === 'string'){
+        this.forEach(elm => elm.innerHTML = value);
+      }else if(typeof value === 'function'){
+        this.forEach(elm => {
+          let newValue = callFunc(value, fromElm(this, elm), elm.innerHTML);
+          if(newValue !== undefined){
+            elm.innerHTML = newValue;
+          }
         });
       }else{
-        delete this.dataStorage[key];
+        return this[0].innerHTML;
       }
       return this;
     }
 
-    hasData(key){
-      if(Array.isArray(key)){
-        for(let i = 0; i < key.length; i++){
-          if(this.dataStorage[key[i]]){
-            return true;
+    text(value){
+      if(typeof value === 'string'){
+        this.forEach(elm => elm.textContent = value);
+      }else if(typeof value === 'function'){
+        this.forEach(elm => {
+          let newValue = callFunc(value, fromElm(this, elm), elm.textContent);
+          if(newValue !== undefined){
+            elm.textContent = newValue;
+          }
+        });
+      }else{
+        return this[0].textContent;
+      }
+      return this;
+    }
+
+
+    tag(value){
+      if(typeof value === 'string'){
+        this.forEach((elm, i) => {
+          const clone = document.createElement(value);
+          for(let i = 0; i < elm.attributes.length; i++){
+            let {name, value} = elm.attributes[i];
+            if(name === 'class'){
+              let classes = value.split(' ');
+              for(let j in classes){
+                clone.classList.add(classes[j]);
+              }
+            }else{
+              clone[name] = value;
+            }
+          }
+
+          elm.parentNode.insertBefore(clone, elm);
+
+          let child = [...elm.childNodes];
+          for(let i = 0; i < child.length; i++){
+            clone.appendChild(child[i]);
+          }
+
+          elm.remove();
+
+          this[i] = clone;
+        });
+        return this;
+      }
+      if(typeof value === 'function'){
+        this.forEach(elm => {
+          callFunc(value, fromElm(this, elm), elm.tagName);
+        });
+        return this;
+      }
+      return this[0].tagName;
+    }
+
+    value(value){
+      if(value === ''){
+        this.removeAttr('value');
+        return this;
+      }
+      return this.attr('value', value);
+    }
+    val(value){return this.value(value);}
+
+    id(value){
+      if(value === ''){
+        this.removeAttr('id');
+        return this;
+      }
+      return this.attr('id', value);
+    }
+    name(value){
+      if(value === ''){
+        this.removeAttr('name');
+        return this;
+      }
+      return this.attr('name', value);
+    }
+    type(value){
+      if(value === ''){
+        this.removeAttr('type');
+        return this;
+      }
+      return this.attr('type', value);
+    }
+
+    url(value){
+      let res = [];
+      this.forEach(elm => {
+        const tag = elm.tagName.toLowerCase();
+        if(elementUrlTagTypes.src.includes(tag)){
+          if(value === ''){
+            res.push($(elm).removeAttr('src'));
+          }else{
+            res.push($(elm).attr('src', value));
+          }
+        }else if(elementUrlTagTypes.href.includes(tag)){
+          if(value === ''){
+            res.push($(elm).removeAttr('href'));
+          }else{
+            res.push($(elm).attr('href', value));
+          }
+        }else{
+          let attr = elementUrlTagTypes.other[tag];
+          if(!attr){attr = 'src';}
+          if(value === ''){
+            res.push($(elm).removeAttr(attr));
+          }else{
+            res.push($(elm).attr(attr, value));
           }
         }
-        return false;
+      });
+      if(value !== undefined){
+        return this;
       }
-      return this.dataStorage[key] !== undefined;
+      return res[0];
+    }
+    src(value){
+      if(value === ''){
+        this.removeAttr('src');
+        return this;
+      }
+      return this.attr('src', value);
+    }
+    href(value){
+      if(value === ''){
+        this.removeAttr('href');
+        return this;
+      }
+      return this.attr('href', value);
     }
 
-    cloneData(elm){
-      let e = new Element(elm);
-      e.dataStorage = this.dataStorage;
-      return e;
-    }
 
+
+    query(param, elm = document){
+      $(param, elm).forEach(e => {
+        this.push(e);
+      });
+      return this;
+    }
 
     each(sel, cb){
       if(typeof sel === 'function'){
-        cb = sel;
-        sel = undefined;
+        [sel, cb] = [cb, sel];
       }
-
       this.forEach(elm => {
         if(elm != null){
           if(sel){
-            elm.querySelectorAll(sel).forEach(e => {
-              cb.call(this.cloneData(e), e);
+            getQuery(sel, elm).forEach(e => {
+              callFunc(cb, fromElm(this, e));
             });
           }else{
-            cb.call(this.cloneData(elm), elm);
+            callFunc(cb, fromElm(this, elm));
           }
         }
       });
       return this;
     }
 
-    loop(interval, sel, cb){
-      if(typeof sel === 'function'){
-        cb = sel;
-        sel = undefined;
-      }
+    loop(ms, sel, cb, limit){
+      [ms, sel, cb, limit] = $.sort([ms, 'num'], [sel, 'str', 'arr', 'elm'], [cb, 'func'], [limit, 'num']);
+      this.forEach(elm => {
+        if(elm != null){
+          if(sel){
+            getQuery(sel, elm).forEach(e => {
+              function stop(){clearInterval(interval);}
+              cb = func(cb, [fromElm(this, e),,{stop}]);
 
-      interval = Number(interval) || 100;
+              const interval = setInterval(() => {
+                cb.call(limit);
+                if(limit !== undefined && --limit <= 0){
+                  clearInterval(interval);
+                }
+              }, ms);
+            });
+          }else{
+            function stop(){clearInterval(interval);}
+            cb = func(cb, [fromElm(this, e),,{stop}]);
 
-      if(sel !== undefined && sel != null){
-        setInterval(() => {
-          this.forEach(elm => {
-            if(elm != null){
-              elm.querySelectorAll(sel).forEach(e => {
-                cb.call(this.cloneData(e), e);
-              });
-            }
-          });
-        }, interval);
-
-        this.forEach(elm => {
-          if(elm != null){
-            let elem = new Element(elm);
-            let i = setInterval(() => {
-              if(elm == null || elem[0] == null){
-                clearInterval(i);
-                return;
+            const interval = setInterval(() => {
+              cb.call(limit);
+              if(limit !== undefined && --limit <= 0){
+                clearInterval(interval);
               }
-              elm.querySelectorAll(sel).forEach(e => {
-                cb.call(elem.cloneData(e), e);
-              });
-            }, interval);
+            }, ms);
           }
-        });
-      }else{
-        this.forEach(elm => {
-          if(elm != null){
-            let elem = new Element(elm);
-            let i = setInterval(() => {
-              if(elm == null || elem[0] == null){
-                clearInterval(i);
-                return;
-              }
-              cb.call(elem, elm);
-            }, interval);
-          }
-        });
-      }
+        }
+      });
       return this;
     }
 
-    on(event, cbOrSel, cb){
+    on(event, sel, cb){
+      if(typeof sel === 'function'){
+        [sel, cb] = [cb, sel];
+      }
       if(!Array.isArray(event)){
         event = [event];
       }
-      if(typeof cbOrSel === 'function'){
-        this.each(elm => {
+
+      if(typeof cb !== 'function'){return this;}
+
+      if(sel){
+        this.forEach(elm => {
           for(let i = 0; i < event.length; i++){
             elm.addEventListener(event[i], e => {
-              cbOrSel.call(this.cloneData(elm), e);
-            }, {passive: false});
-          }
-        });
-        return this;
-      }else{
-        this.each(elm => {
-          for(let i = 0; i < event.length; i++){
-            elm.addEventListener(event[i], e => {
-              if(e.target.matches(cbOrSel)){
+              if(e.target.matches(sel)){
                 cb.call(this.cloneData(elm), e);
               }
             }, {passive: false});
           }
         });
+        return this;
       }
+      this.forEach(elm => {
+        for(let i = 0; i < event.length; i++){
+          elm.addEventListener(event[i], e => {
+            callFunc(cb, fromElm(this, elm), e);
+          }, {passive: false});
+        }
+      });
       return this;
     }
 
-    onStop(event, cbOrSel, cb){
-      if(typeof cbOrSel === 'function'){
-        this.on(event, function(e){
-          if(!this.hasData('lastEventTime')){
-            this.data('lastEventTime', new Date().getTime());
-            let interval = setInterval(() => {
-              if((new Date().getTime()) > this.data('lastEventTime') + 100){
-                cbOrSel.call(this, e);
-                this.removeData('lastEventTime');
-                clearInterval(interval);
-              }
-            }, 100);
-          }
-          this.data('lastEventTime', new Date().getTime());
-        });
-      }else{
-        this.on(event, cbOrSel, function(e){
-          if(!this.hasData('lastEventTime')){
-            this.data('lastEventTime', new Date().getTime());
-            let interval = setInterval(() => {
-              if((new Date().getTime()) > this.data('lastEventTime') + 100){
-                cb.call(this, e);
-                this.removeData('lastEventTime');
-                clearInterval(interval);
-              }
-            }, 100);
-          }
-          this.data('lastEventTime', new Date().getTime());
-        });
+    do(event, opts = {}){
+      if(typeof event === 'object' && !Array.isArray(event)){
+        [event, opts] = [opts, event];
       }
+      if(!Array.isArray(event)){
+        event = [event];
+      }
+      this.forEach(elm => {
+        for(let i = 0; i < event.length; i++){
+          elm.dispatchEvent(new Event(event[i], opts));
+        }
+      });
       return this;
     }
+    trigger(event, opts = {}){return this.do(event, opts);}
 
-    onIdle(event, cbOrSel, cbOrInterval, interval){
-      if(typeof cbOrSel === 'function'){
-        this.data('lastEventTime', new Date().getTime() + 100).each(() => {
-          this.on(event, () => {
-            this.data('lastEventTime', new Date().getTime());
-          });
-          let loop = setInterval(() => {
-            if((new Date().getTime()) > this.data('lastEventTime') + (cbOrInterval || 1000)){
-              this.data('lastEventTime', new Date().getTime());
-              cbOrSel.call(this, {stop: function(){clearInterval(loop)}});
-            }
-          }, 10);
-        });
-      }else{
-        this.data('lastEventTime', new Date().getTime() + 100).each(() => {
-          this.on(event, cbOrSel, () => {
-            this.data('lastEventTime', new Date().getTime());
-          });
-          let loop = setInterval(() => {
-            if((new Date().getTime()) > this.data('lastEventTime') + (interval || 1000)){
-              this.data('lastEventTime', new Date().getTime());
-              cbOrInterval.call(this, {stop: function(){clearInterval(loop)}});
-            }
-          }, 10);
-        });
-      }
-      return this;
-    }
 
     ready(cb){
       const isReady = this.some(e => {
@@ -243,711 +995,302 @@
       return this;
     }
 
-    next(){
-      return this.map(e => e.nextElementSibling).filter(e => e != null);
+
+    append(sel, ref){
+      sel = $(sel);
+
+      this.forEach(e => {
+        if(ref){ref = $(ref, e)[0].nextElementSibling;}
+        if(ref){
+          //todo: fix strange issue with insertBefore and for loop
+          console.log(sel);
+          for(let i = sel.length-1; i >= 0; i--){
+            e.insertBefore(sel[i], ref);
+          }
+        }else{
+          for(let i = 0; i < sel.length; i++){
+            e.appendChild(sel[i]);
+          }
+        }
+      });
+
+      return this;
     }
 
-    previous(){
+    prepend(sel, ref){
+      sel = $(sel);
+      if(ref){ref = $(ref)[0];}
+
+      this.forEach(e => {
+        if(ref){
+          for(let i = 0; i < sel.length; i++){
+            e.insertBefore(sel[i], ref);
+          }
+        }else if(e.hasChildren()){
+          let r = e.firstElementChild;
+          for(let i = 0; i < sel.length; i++){
+            e.insertBefore(sel[i], r);
+          }
+        }else{
+          for(let i = 0; i < sel.length; i++){
+            e.appendChild(sel[i]);
+          }
+        }
+      });
+
+      return this;
+    }
+
+    appendTo(sel, ref){
+      $(sel).append(this, ref);
+      return this;
+    }
+
+    prependTo(sel, ref){
+      $(sel).prepend(this, ref);
+      return this;
+    }
+
+    after(sel){
+      $(this).parent().append(sel, this);
+    }
+
+    before(sel){
+      $(this).parent().prepend(sel, this);
+    }
+
+    putAfter(sel){
+      $(sel).parent().append(this, sel);
+    }
+    insertAfter(sel){this.putAfter(sel);}
+
+    putBefore(sel){
+      $(sel).parent().prepend(this, sel);
+    }
+    insertBefore(sel){this.putBefore(sel);}
+
+
+
+    next(sel){
+      if(typeof sel === 'number'){
+        return this.map(e => {
+          if(sel < 0){sel = e.parentNode.children.length - Math.abs(sel);}
+          for(let i = 0; i < sel; i++){
+            let n = e.previousElementSibling;
+            if(!n){break;}
+            e = n;
+          }
+          return e;
+        }).filter(e => e != null);
+      }
+      if(typeof sel === 'string'){
+        return this.map(e => {
+          e = e.previousElementSibling;
+          while(e != null && !$.isQuery(e, sel)){
+            e = e.previousElementSibling;
+          }
+          if(!$.isQuery(e, sel)){return null;}
+          return e;
+        }).filter(e => e != null);
+      }
       return this.map(e => e.previousElementSibling).filter(e => e != null);
     }
 
-    removeClass(className){
-      this.forEach(e => e.classList.remove(className));
-      return this;
-    }
-
-    addClass(className){
-      this.forEach(e => e.classList.add(className));
-      return this;
-    }
-
-    hasClass(className){
-      for(let i = 0; i < this.length; i++){
-        if(this[i] != null){
-          if(this[i].classList.has(className)){
-            return true;
+    previous(sel){
+      if(typeof sel === 'number'){
+        return this.map(e => {
+          if(sel < 0){sel = e.parentNode.children.length - Math.abs(sel);}
+          for(let i = 0; i < sel; i++){
+            let n = e.previousElementSibling;
+            if(!n){break;}
+            e = n;
           }
-        }
+          return e;
+        }).filter(e => e != null);
       }
-      return false;
-    }
-
-    css(prop, value){
-      if(typeof prop === 'object'){
-        let props = Object.keys(prop);
-        this.forEach(e => {
-          for(let i = 0; i < props.length; i++){
-            e.style[props[i]] = prop[props[i]];
+      if(typeof sel === 'string'){
+        return this.map(e => {
+          e = e.previousElementSibling;
+          while(e != null && !$.isQuery(e, sel)){
+            e = e.previousElementSibling;
           }
-        });
-      }else if(value == null){
-        return this[0].style[prop];
-      }else{
-        this.forEach(e => e.style[prop] = value);
+          if(!$.isQuery(e, sel)){return null;}
+          return e;
+        }).filter(e => e != null);
       }
-      return this;
+      return this.map(e => e.previousElementSibling).filter(e => e != null);
     }
 
-    html(html){
-      if(typeof html === 'string'){
-        this.forEach(elm => elm.innerHTML = html);
-      }else if(typeof html === 'function'){
-        this.forEach(elm => elm.innerHTML = html.call(this.cloneData(elm)));
-      }else{
-        return this[0].innerHTML;
-      }
-      return this;
-    }
 
-    text(text){
-      if(typeof text === 'string'){
-        this.forEach(elm => elm.textContent = text);
-      }else if(typeof text === 'function'){
-        this.forEach(elm => elm.textContent = text.call(this.cloneData(elm)));
-      }else{
-        return this[0].textContent;
-      }
-      return this;
-    }
-
-    attr(attr, value){
-      if(typeof attr === 'object'){
-        const a = Object.keys(attr);
-        for(let i = 0; i < a.length; i++){
-          this.forEach(e => e.setAttribute(a[i], attr[a[i]]));
-        }
-      }else if(value !== undefined && value != null){
-        if(typeof value === 'object' || Array.isArray(value)){
-          value = JSON.stringify(value);
-        }
-        this.forEach(e => e.setAttribute(attr, value));
-      }else{
-        let val = this[0].getAttribute(attr);
-        if(typeof val === 'string'){
-          if(val.toLowerCase() === 'true'){
-            return true;
-          }else if(val.toLowerCase() === 'false'){
-            return false;
-          }else if(!isNaN(Number(val))){
-            return Number(val);
-          }else if((val.includes('{') && val.includes('}')) || (val.includes('[') && val.includes(']'))){
-            try{
-              return JSON.parse(val);
-            }catch(e){}
+    parent(sel){
+      if(typeof sel === 'number'){
+        return this.map(e => {
+          if(sel < 0){
+            //todo: get element depth within document
           }
-        }
-        return val;
-      }
-      return this;
-    }
-
-    removeAttr(attr){
-      if(Array.isArray(attr)){
-        attr.forEach(a => {
-          this.forEach(e => e.removeAttribute(a));
-        });
-      }else{
-        this.forEach(e => e.removeAttribute(attr));
-      }
-      return this;
-    }
-
-    hasAttr(attr, value){
-      if(value !== undefined){value = value.toString();}
-      if(Array.isArray(attr)){
-        for(let a = 0; a < attr.length; a++){
-          for(let i = 0; i < this.length; i++){
-            if(this[i].hasAttribute(attr[a]) && (value === undefined || this[i].getAttribute(attr[a]) === value)){
-              return true;
-            }
+          for(let i = 0; i < sel; i++){
+            let n = e.parentNode;
+            if(!n){break;}
+            e = n;
           }
-        }
-      }else{
-        for(let i = 0; i < this.length; i++){
-          if(this[i].hasAttribute(attr) && (value === undefined || this[i].getAttribute(attr) === value)){
-            return true;
+          return e;
+        }).filter(e => e != null);
+      }
+      if(typeof sel === 'string'){
+        return this.map(e => {
+          e = e.parentNode;
+          while(e != null && !$.isQuery(e, sel)){
+            e = e.parentNode;
           }
-        }
+          if(!$.isQuery(e, sel)){return null;}
+          return e;
+        }).filter(e => e != null);
       }
-      return false;
+      return this.map(e => e.parentNode).filter(e => e != null);
+
+      //return new Element(this[0].parentNode);
     }
 
-    get(i = 0){
-      if(i < 0){
-        return this.cloneData(this[this.length + i]);
-      }
-      return this.cloneData(this[i]);
-    }
+    child(sel, index, node){
+      [sel, index, node] = $.sort([sel, 'str'], [index, 'num'], [node, 'bool']);
 
-    width(){
-      if(this[0] === window || this[0] === document){
-        return window.innerWidth;
-      }
-      return this[0].clientWidth || this[0].offsetWidth;
-    }
-
-    height(){
-      if(this[0] === window || this[0] === document){
-        return window.innerHeight;
-      }
-      return this[0].clientHeight || this[0].offsetHeight;
-    }
-
-    offset(){
-      if(this[0] === window || this[0] === document){
-        return {
-          width: window.innerWidth,
-          height: window.innerHeight
-        };
-      }
-      return {
-        width: this[0].offsetWidth,
-        height: this[0].offsetHeight
-      }
-    }
-
-    scroll(cbOrYOrX, y){
-      function handleNumber(elem, x, y){
-        if(typeof y === 'undefined' || y == null){
-          y = x;
-          x = 0;
-        }
-        if(typeof x === 'undefined' || x == null){
-          return false;
-        }
-
-        if(typeof y === 'string' && y.endsWith('%') && typeof x === 'string' && x.endsWith('%')){
-          y = Number(y.replace(/^([^0-9]+(?:\.[0-9]+)).*/s, '$1'));
-          x = Number(x.replace(/^(-?[^0-9]+(?:\.[0-9]+)).*/s, '$1'));
-          elem.forEach(elm => {
-            if(elm === window || elm === document){
-              y = y * window.innerHeight / 100;
-              x = x * window.innerWidth / 100;
-              window.scrollBy(x, y);
-            }else{
-              y = y * elm.clientHeight / 100;
-              x = x * elm.clientWidth / 100;
-              elm.scrollBy(x, y);
-            }
-          });
-          return true;
-        }
-        if(typeof y === 'string' && !y.endsWith('%')){
-          y = Number(y.replace(/^([^0-9]+(?:\.[0-9]+)).*/s, '$1'));
-        }
-        if(typeof x === 'string' && !x.endsWith('%')){
-          x = Number(x.replace(/^([^0-9]+(?:\.[0-9]+)).*/s, '$1'));
-        }
-        if(typeof y === 'string' && y.endsWith('%')){
-          y = Number(y.replace(/^([^0-9]+(?:\.[0-9]+)).*/s, '$1'));
-          elem.forEach(elm => {
-            if(elm === window || elm === document){
-              y = y * window.innerHeight / 100;
-              window.scrollBy(Number(x) || 0, y);
-            }else{
-              y = y * elm.clientHeight / 100;
-              elm.scrollBy(Number(x) || 0, y);
-            }
-          });
-          return true;
-        }
-        if(typeof x === 'string' && x.endsWith('%')){
-          x = Number(x.replace(/^([^0-9]+(?:\.[0-9]+)).*/s, '$1'));
-          elem.forEach(elm => {
-            if(elm === window || elm === document){
-              x = x * window.innerWidth / 100;
-              window.scrollBy(x, y);
-            }else{
-              x = x * elm.clientWidth / 100;
-              elm.scrollBy(x, y);
-            }
-          });
-          return true;
-        }
-        if(typeof y === 'number'){
-          elem.forEach(elm => {
-            if(elm === window || elm === document){
-              window.scrollBy(Number(x) || 0, y);
-            }else{
-              elm.scrollBy(Number(x) || 0, y);
-            }
-          });
-          return true;
-        }
-        return false;
-      }
-      if(handleNumber(this, cbOrYOrX, y)){
-        return this;
-      }
-
-      if(typeof cbOrYOrX === 'function'){
-        this.each(function(elm){
-          if(elm === window || elm === document){
-            window.addEventListener('scroll', e => {
-              let res = cbOrYOrX.call(this.cloneData(window), e, {
-                top: window.scrollY,
-                left: window.scrollX,
-                bottom: window.scrollY + window.innerHeight,
-                right: window.scrollX + window.innerWidth,
-                width: document.body.scrollHeight,
-                height: document.body.scrollHeight
-              });
-              if(res !== undefined){
-                if(Array.isArray(res)){
-                  handleNumber(window, ...res);
-                }else if(typeof res === 'object'){
-                  handleNumber(window, res.x || 0, res.y || 0);
-                }else{
-                  handleNumber(window, res);
-                }
-              }
-            });
-          }else{
-            this.on('scroll', function(e){
-              let res = cbOrYOrX.call(this, e, {
-                top: e.target.scrollTop,
-                left: e.target.scrollLeft,
-                bottom: e.target.scrollTop + e.target.clientHeight,
-                right: e.target.scrollLeft + e.target.clientWidth,
-                width: e.target.scrollWidth,
-                height: e.target.scrollHeight
-              });
-              if(res !== undefined){
-                if(Array.isArray(res)){
-                  handleNumber(this, ...res);
-                }else if(typeof res === 'object'){
-                  handleNumber(this, res.x || 0, res.y || 0);
-                }else{
-                  handleNumber(this, res);
-                }
-              }
-            });
-          }
-        });
-        return this;
-      }
-
-      if(this[0] === window || this[0] === document){
-        return {
-          top: window.scrollY,
-          left: window.scrollX,
-          bottom: window.scrollY + window.innerHeight,
-          right: window.scrollX + window.innerWidth,
-          width: document.body.scrollHeight,
-          height: document.body.scrollHeight
-        };
-      }
-      return {
-        top: this[0].scrollTop,
-        left: this[0].scrollLeft,
-        bottom: this[0].scrollTop + this[0].clientHeight,
-        right: this[0].scrollLeft + this[0].clientWidth,
-        width: this[0].scrollWidth,
-        height: this[0].scrollHeight
-      };
-    }
-
-    scrollTo(elmOrYOrXOrI, yOrI){
-      function handleNumber(elem, x, y){
-        if(typeof y === 'undefined' || y == null){
-          y = x;
-          x = 0;
-        }
-        if(typeof x === 'undefined' || x == null){
-          return false;
-        }
-
-        if(typeof y === 'string' && y.endsWith('%') && typeof x === 'string' && x.endsWith('%')){
-          y = Number(y.replace(/^([^0-9]+(?:\.[0-9]+)).*/s, '$1'));
-          x = Number(x.replace(/^(-?[^0-9]+(?:\.[0-9]+)).*/s, '$1'));
-          elem.forEach(elm => {
-            if(elm === document){elm = window;}
-            elm = this.cloneData(elm);
-            y = y * elm.height() / 100;
-            x = x * elm.width() / 100;
-            elm[0].scrollTo(x, y);
-          });
-          return true;
-        }
-        if(typeof y === 'string' && !y.endsWith('%')){
-          y = Number(y.replace(/^([^0-9]+(?:\.[0-9]+)).*/s, '$1'));
-        }
-        if(typeof x === 'string' && !x.endsWith('%')){
-          x = Number(x.replace(/^([^0-9]+(?:\.[0-9]+)).*/s, '$1'));
-        }
-        if(typeof y === 'string' && y.endsWith('%')){
-          y = Number(y.replace(/^([^0-9]+(?:\.[0-9]+)).*/s, '$1'));
-          elem.forEach(elm => {
-            if(elm === document){elm = window;}
-            elm = this.cloneData(elm);
-            y = y * elm.height() / 100;
-            elm[0].scrollTo(x, y);
-          });
-          return true;
-        }
-        if(typeof x === 'string' && x.endsWith('%')){
-          x = Number(x.replace(/^([^0-9]+(?:\.[0-9]+)).*/s, '$1'));
-          elem.forEach(elm => {
-            if(elm === document){elm = window;}
-            elm = this.cloneData(elm);
-            x = x * elm.width() / 100;
-            elm[0].scrollTo(x, y);
-          });
-          return true;
-        }
-        if(typeof y === 'number'){
-          elem.forEach(elm => {
-            if(elm === document){elm = window;}
-            elm.scrollTo(Number(x) || 0, y);
-            //scrollAnim(elm, Number(x) || 0, y);
-          });
-          return true;
-        }
-        return false;
-      }
-      if(handleNumber(this, elmOrYOrXOrI, yOrI)){
-        return this;
-      }
-
-      if(typeof elmOrYOrXOrI === 'number'){
-        if(this[elmOrYOrXOrI] === window || this[elmOrYOrXOrI] === document){
-          window.scrollTo(0);
-        }else{
-          this[elmOrYOrXOrI].scrollIntoView();
-        }
-        return this;
-      }
-
-      if(elmOrYOrXOrI){
-        if(!Number(yOrI)){
-          yOrI = 0;
-        }
-        this.forEach(elm => {
-          let e = elm.querySelectorAll(elmOrYOrXOrI)[yOrI];
-          if(e === window || e === document){
-            window.scrollTo(0);
-          }else{
-            e.scrollIntoView();
-          }
-        });
-        return this;
-      }
-
-      if(this[0] === window || this[0] === document){
-        window.scrollTo(0);
-      }else{
-        this[0].scrollIntoView();
-      }
-
-      return this;
-    }
-
-    parent(){
-      return new Element(this[0].parentNode);
-    }
-
-    child(elmOrIndex, index, node = true){
-      if(!this[0].children.length){
-        return null;
-      }
-      if(!elmOrIndex){
-        return new Element(this[0].firstElementChild);
-      }
-      if(typeof elmOrIndex === 'number'){
-        if(node && !this[0].hasChildNodes){
-          return null;
-        }
-        if(elmOrIndex === 0){
-          return new Element(this[0].firstElementChild);
-        }else if(elmOrIndex === -1){
-          return new Element(this[0].lastElementChild);
-        }else{
-          let elms = node ? this[0].childNodes : this[0].children;
-          if(elmOrIndex < 0){
-            elmOrIndex = elms.length + elmOrIndex;
-          }
-          if(elmOrIndex < 0){
-            return null;
-          }
-          return new Element(elms[elmOrIndex]);
-        }
-      }else if(typeof elmOrIndex === 'string' && index === undefined && node){
-        return new Element(...this[0].querySelectorAll(elmOrIndex));
-      }else if(typeof elmOrIndex === 'string'){
-        let elms = node ? this[0].childNodes : this[0].children;
-        if(index === 0){
-          for(let i = 0; i < elms.length; i++){
-            if(e.tag && e.tag.toLowerCase() === elmOrIndex.toLowerCase()){
-              return new Element(elms[i]);
-            }
-          }
-          return null;
-        }else if(index === -1){
-          for(let i = elms.length - 1; i >= 0; i--){
-            if(e.tag && e.tag.toLowerCase() === elmOrIndex.toLowerCase()){
-              return new Element(elms[i]);
-            }
-          }
-          return null;
-        }
-        elms.filter(e => {
-          if(!e.tag){
-            return false;
-          }
-          return e.tag.toLowerCase() === elmOrIndex.toLowerCase();
-        });
-        if(!index){
-          return new Element(...elms);
-        }else if(index < 0){
-          index = elms.length + index;
-        }
-        if(index < 0){
-          return null;
-        }
-        return new Element(elms[index]);
-      }
-      return node ? new Element(...this[0].childNodes) : new Element(...this[0].children);
-    }
-
-    clone(node = true){
-      return new Element(this[0].cloneNode);
-    }
-
-    append(elm, ref){
-      let elms = [];
-      if(typeof elm === 'string'){
-        elm.replace(/<([\w_$-]+)(?:\s+(.*?))>((?:<\1(?:\s+.*?)>(?:.*?<\/\1>|.)*?)<\/\1>|)/gs, function(_, tag, attrs, html){
-          let e = document.createElement(tag);
-          attrs.replace(/([\w_$-]+)=([\w_$-]+|"(?:\\[\\"]|.)*?"|'(?:\\[\\']|.)*?')/gs, function(_, key, value){
-            value = value.replace(/^(["'])(.*)\1$/, '$2');
-            if(key.toLowerCase() === 'class'){
-              e.classList.add(value);
-            }else{
-              e[key] = value;
-            }
-          });
-          e.innerHTML = html;
-          elms.push(e);
-        });
-      }else if(Array.isArray(elm)){
-        elms = elm;
-      }else{
-        elms = [elm];
-      }
-
-      if(ref){
-        if(typeof ref === 'string'){
-          ref = e.querySelector(ref);
-        }else if(ref instanceof Element){
-          ref = ref[0];
-        }else if(ref === document || ref === window){
-          ref = null;
-        }
-      }
-
-      this.forEach(e => {
-        if(ref){
-          for(let i = 0; i < elms.length; i++){
-            e.insertBefore(elms[i], ref.nextElementSibling);
-          }
-        }else{
-          for(let i = 0; i < elms.length; i++){
-            e.appendChild(elms[i]);
-          }
-        }
-      });
-      return this;
-    }
-
-    prepend(elm, ref){
-      let elms = [];
-      if(typeof elm === 'string'){
-        elm.replace(/<([\w_$-]+)(?:\s+(.*?))>((?:<\1(?:\s+.*?)>(?:.*?<\/\1>|.)*?)<\/\1>|)/gs, function(_, tag, attrs, html){
-          let e = document.createElement(tag);
-          attrs.replace(/([\w_$-]+)=([\w_$-]+|"(?:\\[\\"]|.)*?"|'(?:\\[\\']|.)*?')/gs, function(_, key, value){
-            value = value.replace(/^(["'])(.*)\1$/, '$2');
-            if(key.toLowerCase() === 'class'){
-              e.classList.add(value);
-            }else{
-              e[key] = value;
-            }
-          });
-          e.innerHTML = html;
-          elms.push(e);
-        });
-      }else if(Array.isArray(elm)){
-        elms = elm;
-      }else{
-        elms = [elm];
-      }
-
-      if(ref){
-        if(typeof ref === 'string'){
-          ref = e.querySelector(ref);
-        }else if(ref instanceof Element){
-          ref = ref[0];
-        }else if(ref === document || ref === window){
-          ref = null;
-        }
-      }
-
-      this.forEach(e => {
-        if(ref){
-          for(let i = 0; i < elms.length; i++){
-            e.insertBefore(elms[i], ref);
-          }
-        }else if(e.hasChildNodes()){
-          let r = e.firstElementChild;
-          for(let i = 0; i < elms.length; i++){
-            e.insertBefore(elms[i], r);
-          }
-        }else{
-          for(let i = 0; i < elms.length; i++){
-            e.append(elms[i]);
-          }
-        }
-      });
-      return this;
-    }
-
-
-    tag(value){
-      if(typeof value === 'string'){
-        this.forEach((elm, i) => {
-          let par = elm.parentNode;
-          let newElm = document.createElement(value);
-          [...elm.attributes].forEach(key => {
-            newElm.setAttribute(key.name, key.value);
-          });
-          par.insertBefore(newElm, elm);
-          elm.remove();
-          this[i] = newElm;
-        });
-        return this;
-      }else{
-        return this[0].tag;
-      }
-    }
-
-    type(value){
-      if(value === '' || value === null){
-        return this.removeAttr('type');
-      }
-      return this.attr('type', value);
-    }
-
-    name(value){
-      if(value === '' || value === null){
-        return this.removeAttr('name');
-      }
-      return this.attr('name', value);
-    }
-
-    id(value){
-      if(value === '' || value === null){
-        return this.removeAttr('id');
-      }
-      return this.attr('id', value);
-    }
-
-    value(value){
-      if(value === '' || value === null){
-        return this.removeAttr('value');
-      }
-      return this.attr('value', value);
-    }
-
-    val(value){
-      return this.value(value);
-    }
-
-    src(value){
-      if(value === '' || value === null){
-        return this.removeAttr('src');
-      }
-      return this.attr('src', value);
-    }
-
-    href(value){
-      if(value === '' || value === null){
-        return this.removeAttr('href');
-      }
-      return this.attr('href', value);
-    }
-
-
-    do(cb){
-      cb.call(this);
-    }
-
-    animation(data, cb){
-      if(typeof data === 'function'){
-        cb = data;
-        data = {};
-      }
+      let result = [];
       this.forEach(elm => {
-        let animData = {...data};
-        let anim = () => {
-          let r = cb.call(this.cloneData(elm), animData);
-          if(!r){
-            window.requestAnimationFrame(anim);
-          }else if(typeof r === 'number'){
-            setTimeout(function(){
-              window.requestAnimationFrame(anim);
-            }, r);
+        let child;
+        if(node){
+          child = [...elm.childNodes];
+        }else{
+          child = [...elm.children];
+        }
+        if(sel){
+          let res = [];
+          for(let i = 0; i < child.length; i++){
+            if($.isQuery(child[i], sel)){
+              res.push(child[i]);
+            }
           }
-        };
-        window.requestAnimationFrame(anim);
+          child = res;
+        }
+        if(index !== undefined){
+          if(index % 1 !== 0){
+            let [start, end] = index.toString().split('.');
+            start = Number(start);
+            if(start < 0){start = child.length - Math.abs(start);}
+            end = Number(start) + Number(end);
+            for(let i = start; i <= end; i++){
+              if(child[i] != null){
+                result.push(child[i]);
+              }
+            }
+          }else{
+            if(index < 0){index = child.length - Math.abs(index);}
+            if(child[index] != null){
+              result.push(child[index]);
+            }
+          }
+        }else{
+          result.push(...child);
+        }
       });
+
+      return new Element(...result);
+    }
+
+    clone(deep = true){
+      return new Element(...this.map(elm => {
+        return elm.cloneNode(deep);
+      }));
     }
 
   }
 
 
-  function $(param, elm = document){
-    function querySelector(param){
-      if(elm instanceof NodeList){
-        elm = [...elm];
-      }
-      if(elm instanceof Element){
-        let arr = [];
-        elm.forEach(e => {
-          arr.push(...e.querySelectorAll(param));
-        });
-        return arr;
-      }else if(typeof elm === 'string'){
-        elm = document.querySelectorAll(elm);
-        let arr = [];
-        elm.forEach(e => {
-          arr.push(...e.querySelectorAll(param));
-        });
-        return arr;
-      }else if(Array.isArray(elm)){
-        let arr = [];
-        elm.forEach(e => {
-          if(e === window){
-            return document.querySelectorAll(param);
-          }else{
-            arr.push(...e.querySelectorAll(param));
-          }
-        });
-        return arr;
-      }else if(elm != null){
-        if(elm === window){
-          return document.querySelectorAll(param);
-        }
-        return elm.querySelectorAll(param);
-      }
-      return null;
+  function getQuery(param, elm = document){
+    if(param === 'body' && (elm === document || elm === window)){
+      return [(document.body || document.getElementsByTagName('body')[0])];
     }
 
     if(typeof param === 'string'){
-      return new Element(...querySelector(param));
+      return [...selectQuery(param, elm)];
     }else if(!(param instanceof Element) && Array.isArray(param)){
       let arr = [];
       param.forEach(p => {
         if(typeof p === 'string'){
-          arr.push(...querySelector(p));
+          arr.push(...selectQuery(p, elm));
+        }else if(p instanceof Element){
+          arr = arr.concat(p);
+        }else if(p != null){
+          arr.push(p);
+        }
+      });
+      return arr;
+    }else if(param != null){
+      return [param];
+    }
+
+    return [];
+  }
+
+
+  function selectQuery(param, elm = document){
+    if(elm instanceof NodeList){
+      elm = [...elm];
+    }
+    if(elm instanceof Element){
+      let arr = [];
+      elm.forEach(e => {
+        arr.push(...e.querySelectorAll(param));
+      });
+      return arr;
+    }else if(typeof elm === 'string'){
+      elm = document.querySelectorAll(elm);
+      let arr = [];
+      elm.forEach(e => {
+        arr.push(...e.querySelectorAll(param));
+      });
+      return arr;
+    }else if(Array.isArray(elm)){
+      let arr = [];
+      elm.forEach(e => {
+        if(e === window){
+          return document.querySelectorAll(param);
+        }else{
+          arr.push(...e.querySelectorAll(param));
+        }
+      });
+      return arr;
+    }else if(elm != null){
+      if(elm === window){
+        return document.querySelectorAll(param);
+      }
+      return elm.querySelectorAll(param);
+    }
+    return null;
+  }
+
+
+  function $(param, elm = document){
+    if(param instanceof Element){return param;}
+
+    if(param === 'head' && (elm === document || elm === window)){
+      return new Element(document.head || document.getElementsByTagName('head')[0]);
+    }else if(param === 'body' && (elm === document || elm === window)){
+      return new Element(document.body || document.getElementsByTagName('body')[0]);
+    }
+
+    if(typeof param === 'string' && param.match(/<[\w_\-$]+(?:\s+.*?|)>/)){
+      param = buildHtmlElmArray(param);
+
+      return new Element(...param);
+    }
+
+    if(typeof param === 'string'){
+      return new Element(...selectQuery(param, elm));
+    }else if(Array.isArray(param)){
+      let arr = [];
+      param.forEach(p => {
+        if(typeof p === 'string'){
+          arr.push(...selectQuery(p, elm));
         }else if(p instanceof Element){
           arr = arr.concat(p);
         }else if(p != null){
@@ -958,12 +1301,19 @@
     }else if(param != null){
       return new Element(param);
     }
+
+    return new Element(document);
   }
 
 
+  // define additional keywords
+  $.del = new Date().getTime();
+
+
+  // define basic functions
   $.ready = function(cb){
     let loaded = false;
-  
+
     // for other browsers
     let loops = 10;
     let interval = setInterval(function(){
@@ -972,7 +1322,7 @@
         clearInterval(interval);
       }
     }, 1000);
-  
+
     // for most browsers
     if(document.readyState !== 'loading'){
       ready();
@@ -985,7 +1335,7 @@
         }
       });
     }
-  
+
     function ready(){
       if(loaded){return;}
       loaded = true;
@@ -1008,7 +1358,7 @@
     'jpeg': 'image/jpeg; charset=UTF-8',
     'svg': 'image/svg; charset=UTF-8',
     'webp': 'image/webp; charset=UTF-8',
-    'audio': 'video/mp4; charset=UTF-8',
+    'audio': 'video/mp3; charset=UTF-8',
     'video': 'video/mp4; charset=UTF-8',
     'mp4': 'video/mp4; charset=UTF-8',
     'mov': 'video/mov; charset=UTF-8',
@@ -1016,30 +1366,63 @@
     'wav': 'audio/wav; charset=UTF-8',
     'ogg': 'audio/ogg; charset=UTF-8',
   };
-
-  $.fetch = function(url, data = {}, cb = () => {}, {method = 'GET', timeout = 0, type = 'json'}){
-    let timedOut = false;
-    method = method.toUpperCase();
-
-    const headers = {
-      method: method,
-      headers: {
-        'Content-Type': ajaxContentTypes[type.toLowerCase()] || type
+  function getAjaxContentType(type){
+    let t = ajaxContentTypes[type.toLowerCase()];
+    if(t){
+      return t;
+    }
+    if(!type.includes('/')){
+      type = 'text/'+type;
+    }
+    if(!type.includes(';')){
+      type += '; charset=UTF-8';
+    }
+    return type;
+  }
+  $.fetch = function(url, data = {}, cb = () => {}, {method = 'POST', timeout = 30000, type = 'json'} = {}){
+    const opts = {method, timeout, type};
+    if(typeof data === 'function'){
+      [data, cb] = [cb, data];
+      if(typeof data === 'object'){
+        let keys = Object.keys(opts);
+        for(let i in keys){
+          if(data[keys[i]] !== undefined){
+            opts[keys[i]] = data[keys[i]];
+          }
+        }
+        data = {};
       }
     }
 
-    if(method === 'GET'){
-      url = url+'?'+Object.entries(data).map(([key, value]) => {
-        return `${key}=${value}`;
-      }).join('&');
-    }else if(method === 'POST'){
-      method.body = JSON.stringify(data);
-    }else if(method === 'HEAD'){
-      method.head = JSON.stringify(data);
+    let timedOut = false;
+    opts.method = opts.method.toUpperCase();
+
+    const headers = {
+      method: opts.method,
+      headers: {
+        'Content-Type': getAjaxContentType(type)
+      }
     }
+
+    if(opts.method === 'GET'){
+      if(Object.keys(data).length){
+        url = url+'?'+Object.entries(data).map(([key, value]) => {
+          return `${key}=${value}`;
+        }).join('&');
+      }
+    }else if(opts.method === 'POST'){
+      opts.method.body = JSON.stringify(data);
+    }else if(method === 'HEAD'){
+      opts.method.head = JSON.stringify(data);
+    }
+
+    let timeoutFunc;
+
+    navigator.userAgent
 
     fetch(url, headers).then(res => {
       if(timedOut){return null;}
+      if(timeoutFunc){clearTimeout(timeoutFunc);}
       return {
         info: {
           status: res.status,
@@ -1054,67 +1437,46 @@
       };
     }).then(data => {
       if(timedOut){return null;}
-      let isJSON = (type === 'json');
+      let isJSON = (opts.type === 'json');
       if(isJSON && !((typeof data.content === 'object' && !(data.content instanceof Error) || Array.isArray(data.content)))){
         try{
           data.content = JSON.parse(data.content);
         }catch(e){isJSON = false;}
       }
-      cb.call({success: true, isJSON, ...data.info}, data.content);
+      callFunc(cb, {success: true, isJSON, ...data.info}, data.content);
     }).catch(e => {
       if(timedOut){return null;}
-      if(type === 'json' && !((typeof e === 'object' && !(e instanceof Error)) || Array.isArray(e))){
+      if(timeoutFunc){clearTimeout(timeoutFunc);}
+      if(opts.type === 'json' && !((typeof e === 'object' && !(e instanceof Error)) || Array.isArray(e))){
         e = {error: e};
       }
-      cb.call({success: false, isJSON: (type === 'json'), ok: false}, e);
+      callFunc(cb, {success: false, isJSON: (opts.type === 'json'), ok: false}, e);
     });
 
-    if(setTimeout > 0){
-      setTimeout(function(){
+    if(opts.timeout > 0){
+      timeoutFunc = setTimeout(function(){
         timedOut = true;
         let res = 'Request Timed Out';
-        if(type === 'json'){
+        if(opts.type === 'json'){
           res = {error: res};
         }
-        cb.call({success: false, isJSON: (type === 'json'), timedOut: true, ok: false}, res);
-      }, timeout);
+        callFunc(cb, {success: false, isJSON: (opts.type === 'json'), timedOut: true, ok: false}, res);
+      }, opts.timeout);
     }
 
     return this;
-  }
-
-  $.async = async function(cb){
-    await cb();
   };
 
-
-  $.animation = function(data, cb){
-    if(typeof data === 'function'){
-      cb = data;
-      data = {};
-    }
-    function anim(){
-      let r = cb.call(data, data);
-      if(!r){
-        window.requestAnimationFrame(anim);
-      }else if(typeof r === 'number'){
-        setTimeout(function(){
-          window.requestAnimationFrame(anim);
-        }, r);
-      }
-    }
-    window.requestAnimationFrame(anim);
-  };
 
   $.addStyle = function(href){
     if(!$('link[rel="stylesheet"]').hasAttr('href', href)){
-      $('head').append(`<link rel="stylesheet" href="${href.replace(/"/g, '&quot;')}">`);
+      $.head().append(`<link rel="stylesheet" href="${href.replace(/"/g, '&quot;')}">`);
     }
   };
 
   $.addScript = function(src){
     if(!$('script').hasAttr('src', src)){
-      $('head').append(`<script src="${src.replace(/"/g, '&quot;')}"></script>`);
+      $.head().append(`<script src="${src.replace(/"/g, '&quot;')}"></script>`);
     }
   };
 
@@ -1122,9 +1484,11 @@
     return !!(v instanceof Element);
   };
 
-
   const ranFunctions = [];
   $.once = function(id, cb){
+    if(typeof id === 'function'){
+      [id, cb] = [cb, id];
+    }
     if(ranFunctions[id]){
       return;
     }
@@ -1132,62 +1496,165 @@
     cb();
   };
 
-  $.type = function(value){
-    if(value instanceof Element){
-      return 'element';
-    }else if(value instanceof NodeList){
-      return 'nodelist';
-    }else if(value instanceof Node){
-      return 'node';
-    }else if(value instanceof RegExp){
-      return 'regex';
-    }else if(Array.isArray(value)){
-      return 'array';
-    }else if((typeof value === 'number' && isNaN(value))){
-      return 'nan';
-    }else if(value === null){
-      return 'null';
-    }else if(typeof value === 'boolean'){
-      return 'bool';
+
+  $.isArrowFunction = function(cb){
+    return (typeof cb === 'function' && !cb.toString().startsWith('f'));
+  };
+
+  function fixTypeStr(t){
+    if(typeof t !== 'string'){return undefined;}
+    switch(t){
+      case 'str':
+        return 'string';
+      case 'num':
+        return 'number';
+      case 'bool':
+        return 'boolean';
+      case 'obj':
+        return 'object';
+      case 'arr':
+        return 'array';
+      case 'void':
+      case 'func':
+        return 'function';
+      case 'regex' || 'reg':
+        return 'regexp';
+      case 'elm':
+      case 'elem':
+        return 'element';
+      case 'list':
+        return 'nodelist';
+      default:
+        return t.toLowerCase();          
     }
-    return typeof value;
+  }
+  $.type = function(value, types){
+    let type;
+    if(value instanceof Element){
+      type = 'element';
+    }else if(value instanceof NodeList){
+      type = 'nodelist';
+    }else if(value instanceof Node){
+      type = 'node';
+    }else if(value instanceof RegExp){
+      type = 'regexp';
+    }else if(Array.isArray(value)){
+      type = 'array';
+    }else if((typeof value === 'number' && isNaN(value))){
+      type = 'nan';
+    }else if(value === null){
+      type = 'null';
+    }else{
+      type = typeof value;
+    }
+
+    if(types){
+      if(Array.isArray(types)){
+        return types.map(fixTypeStr).includes(type);
+      }
+      return type === fixTypeStr(types);
+    }
+
+    return type;
+  };
+
+  $.isQuery = function(elm, sel){
+    if(typeof elm === 'string'){
+      [elm, sel] = [sel, elm];
+    }
+
+    if(Array.isArray(elm)){
+      return elm.map(e => $.isQuery(e));
+    }
+
+    //todo: improve function (split by commas and spaces, to improve capabilities)
+
+    let match = true;
+    sel.replace(/\[\s*([\w_\-$\.]+)\s*=\s*(["'])((?:\\[\\"']|.)*?)\1\s*\]/g, function(_, key, q, value){
+      if(elm.getAttribute(key) !== value){
+        match = false;
+      }
+    });
+    if(!match){return false;}
+
+    sel.replace(/\[\s*([\w_\-$\.]+)\s*=\s*(.*?)\s*\]/g, function(_, key, value){
+      if(elm.getAttribute(key) !== value){
+        match = false;
+      }
+    });
+    if(!match){return false;}
+
+    sel.replace(/([.#]|)([\w_\-$\.]+)/g, function(_, key, value){
+      if(key === '.' && !elm.classList.contains(value)){
+        match = false;
+      }else if(key === '#' && elm.id !== value){
+        match = false;
+      }else if(elm.tagName.toLowerCase() !== value.toLowerCase()){
+        match = false;
+      }
+    });
+
+    return match;
   }
 
-  $.sortAttrs = function(){
-    let result = {};
-    let cb;
-    if(typeof arguments[arguments.length-1] === 'function'){
-      cb = arguments.pop;
-    }
-    for(let i = 0; i < arguments.length; i++){
-      if(arguments[i].type === undefined){
-        result[(arguments[i].name || i)] = arguments[i].value;
-        arguments[i].used = true;
-        continue;
-      }
-      let type = $.type(arguments[i].value);
-      if(type === arguments[i].type || (Array.isArray(arguments[i].type) && arguments[i].type.includes(type))){
-        result[(arguments[i].name || i)] = arguments[i].value;
-        arguments[i].used = true;
+  $.sort = function(){
+    let params = [];
+    for(let i in arguments){
+      if(!Array.isArray(arguments[i])){
+        params[i] = arguments[i];
+      }else if(arguments[i].length === 1){
+        params[i] = arguments[i][0];
       }else{
+        let args = [...arguments[i]];
+        let arg = args.shift();
+        if($.type(arg, args)){
+          params[i] = arg;
+        }
+      }
+    }
+
+    let moved = [];
+    for(let i = 0; i < arguments.length; i++){
+      if(params[i] === undefined){
         for(let j = 0; j < arguments.length; j++){
-          if(arguments[j].used || j === i){continue;}
-          let type = $.type(arguments[j].value);
-          if(type === arguments[i].type || (Array.isArray(arguments[i].type) && arguments[i].type.includes(type))){
-            result[(arguments[i].name || i)] = arguments[j].value;
-            arguments[j].used = true;
-            break;
+          if(params[j] === undefined && moved[j] === undefined){
+            let args = [...arguments[j]];
+            args.shift();
+            if($.type(arguments[i][0], args)){
+              moved[j] = arguments[i][0];
+              break;
+            }
           }
         }
-        if(result[(arguments[i].name || i)] === undefined){
-          result = arguments[i].default;
-        }
       }
     }
-    if(cb){
-      return cb(...result);
+
+    for(let i in moved){
+      params[i] = moved[i];
     }
-    return result;
+
+    return params;
+  };
+
+  $.loop = function(ms, cb, limit){
+    [ms, cb, limit] = $.sort([ms, 'num'], [cb, 'func'], [limit, 'num']);
+
+    if(typeof cb !== 'function'){
+      return undefined;
+    }
+
+    cb = func(cb, [{stop}], true);
+
+    function stop(){
+      clearInterval(interval);
+    }
+
+    const interval = setInterval(function(){
+      cb.call(limit);
+      if(limit !== undefined && --limit <= 0){
+        clearInterval(interval);
+      }
+    }, ms);
   };
 
 
@@ -1197,7 +1664,27 @@
       return true;
     }
     return false;
+  };
+
+
+  // add common tags
+  let commonTags = {};
+  function addCommonTag(tag){
+    return function(){
+      if(commonTags[tag]){
+        return commonTags[tag];
+      }
+      let elm = new Element(document[tag] || document.getElementsByTagName(tag)[0]);
+      if(elm){commonTags[tag] = elm;}
+      return elm;
+    }
   }
+  $.head = addCommonTag('head');
+  $.body = addCommonTag('body');
+  $.header = addCommonTag('header');
+  $.main = addCommonTag('main');
+  $.footer = addCommonTag('footer');
+
 
   return $;
 })();
