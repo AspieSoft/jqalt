@@ -195,6 +195,7 @@ function $(param, elm = document){
 $.del = new Date().getTime();
 
 
+//todo: add depreciated warning
 $.addMethod = function(name, alias, cb){
   if(typeof alias === 'function'){
     [alias, cb] = [cb, alias];
