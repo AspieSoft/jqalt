@@ -55,7 +55,7 @@ class Element extends Array {
     return this;
   }
 
-  //todo: add common class functions
+  //todo: add common class functions (also test browser compatibility)
 }
 
 ;(function(){
