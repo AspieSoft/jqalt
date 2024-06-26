@@ -448,6 +448,9 @@ class Element extends Array {
 
   //todo: add class methods
   // include addClass, hasClass, delClass, toggleClass
+  //
+  // (may add class method to try and to multiple tasks) [addClass if value, hasClass if key only, delClass if bool false, toggleClass if bool null]
+  // may need to include simple named methods as shorthands for ease of use
 
   //todo: allow callback to detect class changes (onClass) (mayby add offClass)
   //* (or may just use existing class methods with an optional callback)
