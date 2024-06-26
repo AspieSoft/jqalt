@@ -331,8 +331,8 @@ class Element extends Array {
 
   // get or set a css value
   //
-  // when getting values, @sel is used as an html selector in an each loop (strings only).
-  // what setting values, @sel is used as a value selector `window.getComputedStyle(elm, sel)`.
+  // when setting values, @sel is used as an html selector in an each loop (strings only).
+  // what getting values, @sel is used as a value selector `window.getComputedStyle(elm, sel)` (i.e. sel = ':after').
   //
   // you can pass an object value to set a list of key value pairs.
   //
