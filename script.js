@@ -252,7 +252,7 @@ class Element extends Array {
   }
 
   //todo: add methods: click, fucus, blur
-  // for events
+  //? for events
   // may call existing jqalt methods
   // use both on and do events
 
@@ -443,7 +443,7 @@ class Element extends Array {
   // if no key is specified, include any key as a function argument
 
   //todo: add methods: id, tag, type, name, value, url (smart href || src) (use $.urlTag)
-  // for html attributes
+  //? for html attributes
   // may call existing jqalt methods
 
   //todo: add class methods
