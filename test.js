@@ -4,6 +4,5 @@
 
   const h1 = $('h1');
 
-  $('.main-content').append(elm, h1);
-
+  // $('.main-content').append(elm, h1);
 });

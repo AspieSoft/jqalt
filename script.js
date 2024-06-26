@@ -1,27 +1,41 @@
 class Element extends Array {
-  dataStorage = {};
+  dataStorage = [];
 
-  data(key, value){
+  // store javascript side data on a particular element or list of elements
+  //
+  // this can be used as an alternative to setting html arguments,
+  // if you need a faster way to store more complex data than just strings.
+  //
+  // this can also be used for keeping private data attached to an element for a specific variable.
+  data(key, value, index){
+    if(typeof index !== 'number'){
+      index = -1;
+    }
+
+    if(typeof this.dataStorage[index] !== 'object'){
+      this.dataStorage[index] = {};
+    }
+
     switch ($.type(key)) {
       case 'function':
-        key.call(this, this.dataStorage);
+        key.call(this, this.dataStorage[index]);
         return this;
       case 'undefined':
-        return this.dataStorage;
+        return this.dataStorage[index];
       case 'object':
         let keys = Object.keys(key);
         for(let i in keys){
           if(key[keys[i]] === null){
-            delete this.dataStorage[keys[i]];
+            delete this.dataStorage[index][keys[i]];
           }else{
-            this.dataStorage[keys[i]] = key[keys[i]];
+            this.dataStorage[index][keys[i]] = key[keys[i]];
           }
         }
         return this;
       case 'array':
         let res = {};
         for(let i in key){
-          res[key[i]] = this.dataStorage[key[i]];
+          res[key[i]] = this.dataStorage[index][key[i]];
         }
 
         if(typeof value === 'function'){
@@ -35,19 +49,26 @@ class Element extends Array {
 
     switch ($.type(value)) {
       case 'function':
-        key.call(this, this.dataStorage[key]);
+        key.call(this, this.dataStorage[index][key]);
         return this;
       case 'undefined':
-        return this.dataStorage[key];
+        return this.dataStorage[index][key];
       case 'null':
-        delete this.dataStorage[key];
+        delete this.dataStorage[index][key];
         return this;
       default:
-        this.dataStorage[key] = value;
+        this.dataStorage[index][key] = value;
         return this;
     }
   }
 
+  // return element from a specified index
+  // default: 0
+  elm(index = 0){
+    return this[index];
+  }
+
+  // add elements to query list
   query(param, elm = document){
     $(param, elm).forEach(e => {
       this.push(e);
@@ -55,10 +76,210 @@ class Element extends Array {
     return this;
   }
 
-  //todo: add common class functions (also test browser compatibility)
+  // run callback method for each element
+  each(sel, cb){
+    if(typeof sel === 'function'){[sel, cb] = [cb, sel];}
+    if(typeof cb !== 'function'){return this;}
+
+    // split selector list by spaces
+    if(typeof sel === 'string'){
+      sel = sel.split(/(,|[^,]*\[(?:".*?"|'.*?'|`.*?`|.)*?\][^,]*)/).map(s => s.trim()).filter(s => s !== '' && s !== ',');
+    }
+
+    this.forEach((elm, index) => {
+      if(elm != null){
+        // check for matching selector
+        if(Array.isArray(sel)){
+          let m = false;
+          for(let s of sel){
+            if($.isQuery(elm, s)){
+              m = true;
+            }
+          }
+
+          if(!m){
+            return;
+          }
+        }
+
+        // make elm an instance of jqalt Element
+        const e = new Element(elm);
+
+        // merge dataStorage index of element
+        if(typeof this.dataStorage[index] !== 'object'){
+          this.dataStorage[index] = {};
+        }
+        e.dataStorage[-1] = this.dataStorage[index];
+
+        // run callback method with 'this' var as the element instance
+        // return normal elm node as 1st arg
+        // return list index as 2nd arg
+        cb.call(e, elm, index);
+      }
+    });
+
+    return this;
+  }
+
+  // addEventListener
+  on(event, sel, cb, opts){
+    [sel, cb, opts] = $.sort([sel, 'str'], [cb, 'func'], [opts, 'obj']);
+    if(!Array.isArray(event) && typeof event !== 'string' && !(event instanceof CustomEvent)){return this;}
+    if(typeof event === 'string'){event = event.split(' ');}
+    if(typeof cb !== 'function'){return this;}
+    if(typeof opts !== 'object' && opts !== 'boolean'){opts = {};}
+
+    this.each(sel, function(elm, index){
+      // prevent accidental double firing of event
+      let cbEv = $.limit(cb);
+
+      if(event instanceof CustomEvent){
+        elm.addEventListener(event.type, e => {
+          cbEv.type = e.type; // helps prevent duplicate triggers
+          cbEv.call(this, e, elm, index);
+        }, opts);
+        return;
+      }
+
+      for(let ev of event){
+        elm.addEventListener(ev, e => {
+          cbEv.type = e.type; // helps prevent duplicate triggers
+          cbEv.call(this, e, elm, index);
+        }, opts);
+      }
+    });
+
+    return this;
+  }
+
+  // addEventListener and removeEventListener on first call
+  once(event, sel, cb, opts){
+    [sel, cb, opts] = $.sort([sel, 'str'], [cb, 'func'], [opts, 'obj']);
+    if(!Array.isArray(event) && typeof event !== 'string' && !(event instanceof CustomEvent)){return this;}
+    if(typeof event === 'string'){event = event.split(' ');}
+    if(typeof cb !== 'function'){return this;}
+    if(typeof opts !== 'object' && opts !== 'boolean'){opts = {};}
+
+    this.each(sel, function(elm, index){
+      // prevent accidental double firing of event
+      let cbEv = $.limit(cb);
+
+      if(event instanceof CustomEvent){
+        const thisCB = e => {
+          cbEv.type = e.type; // helps prevent duplicate triggers
+          cbEv.call(this, e, elm, index);
+          elm.removeEventListener(event.type, thisCB);
+        };
+
+        elm.addEventListener(event.type, thisCB, opts);
+        return;
+      }
+
+      for(let ev of event){
+        const thisCB = e => {
+          cbEv.type = e.type; // helps prevent duplicate triggers
+          cbEv.call(this, e, elm, index);
+          elm.removeEventListener(ev, thisCB);
+        };
+
+        elm.addEventListener(ev, thisCB, opts);
+      }
+    });
+
+    return this;
+  }
+
+  // dispatchEvent
+  do(event, sel, opts){
+    [sel, opts] = $.sort([sel, 'str'], [opts, 'obj']);
+    if(!Array.isArray(event) && typeof event !== 'string' && !(event instanceof CustomEvent)){return this;}
+    if(typeof event === 'string'){event = event.split(' ');}
+    if(typeof opts !== 'object' && opts !== 'boolean'){opts = {};}
+
+    this.each(sel, function(elm){
+      if(event instanceof CustomEvent){
+        elm.dispatchEvent(event, opts);
+        return;
+      }
+
+      for(let ev of event){
+        elm.dispatchEvent(new Event(ev, opts));
+      }
+    });
+
+    return this;
+  }
+
+  //todo: add methods: click, fucus, blur
+  // for events
+  // may call existing jqalt methods
+  // use both on and do events
+
+  //todo: add css method
+  // auto allow custom css properties with --var syntax
+  // also allow callback function to detect css changes
+  // for change event, include the old and new value
+  // if no key is specified, include any key as a function argument
+
+  //todo: add methods for setting html attributes
+  // include attr (set and get), hasAttr, delAttr
+  // also have attr method return null if a key exists, but does not have a value
+
+  //todo: allow attr method to accept a callback to detect when an attribute is changed
+  // also include the old and new value, and the type of change (added, removed, changed) || (add, del, set)
+  // if no key is specified, include any key as a function argument
+
+  //todo: add methods: id, tag, type, name, value, url (smart href || src) (use $.urlTag)
+  // for html attributes
+  // may call existing jqalt methods
+
+  //todo: add class methods
+  // include addClass, hasClass, delClass, toggleClass
+
+  //todo: allow callback to detect class changes (onClass) (mayby add offClass)
+  // (or may just use existing class methods with an optional callback)
+  // for callback on change event, include what classes were added and removed
+  // (or include old and new class list)
+  // if no key is specified, include any key as a function argument
 }
 
 ;(function(){
+  function selectQuery(param, elm = document){
+    if(elm instanceof NodeList){
+      elm = [...elm];
+    }
+    if(elm instanceof Element){
+      let arr = [];
+      elm.forEach(e => {
+        arr.push(...e.querySelectorAll(param));
+      });
+      return arr;
+    }else if(typeof elm === 'string'){
+      elm = document.querySelectorAll(elm);
+      let arr = [];
+      elm.forEach(e => {
+        arr.push(...e.querySelectorAll(param));
+      });
+      return arr;
+    }else if(Array.isArray(elm)){
+      let arr = [];
+      elm.forEach(e => {
+        if(e === window){
+          return document.querySelectorAll(param);
+        }else{
+          arr.push(...e.querySelectorAll(param));
+        }
+      });
+      return arr;
+    }else if(elm != null){
+      if(elm === window){
+        return document.querySelectorAll(param);
+      }
+      return elm.querySelectorAll(param);
+    }
+    return null;
+  }
+
   function buildHtmlElmArray(param){
     let tags = [];
     let level = [];
@@ -183,42 +404,6 @@ class Element extends Array {
     return elmList;
   }
 
-  function selectQuery(param, elm = document){
-    if(elm instanceof NodeList){
-      elm = [...elm];
-    }
-    if(elm instanceof Element){
-      let arr = [];
-      elm.forEach(e => {
-        arr.push(...e.querySelectorAll(param));
-      });
-      return arr;
-    }else if(typeof elm === 'string'){
-      elm = document.querySelectorAll(elm);
-      let arr = [];
-      elm.forEach(e => {
-        arr.push(...e.querySelectorAll(param));
-      });
-      return arr;
-    }else if(Array.isArray(elm)){
-      let arr = [];
-      elm.forEach(e => {
-        if(e === window){
-          return document.querySelectorAll(param);
-        }else{
-          arr.push(...e.querySelectorAll(param));
-        }
-      });
-      return arr;
-    }else if(elm != null){
-      if(elm === window){
-        return document.querySelectorAll(param);
-      }
-      return elm.querySelectorAll(param);
-    }
-    return null;
-  }
-
   const ajaxContentTypes = {
     'json': 'application/json; charset=UTF-8',
     'text': 'text/plain; charset=UTF-8',
@@ -283,99 +468,8 @@ class Element extends Array {
     }
   }
 
-  function func(cb, args, end){
-    if(!cb.toString().startsWith('f')){
-      // arrow function
-      if(Array.isArray(args)){
-        const first = args.shift();
-        const addArgs = [...args];
-        if(first === undefined){
-          // pre arg without first
-          return {call: function(){
-            const addArgs = [...args];
-            let f = arguments[0];
-            let argIndex = 0;
-            for(let i = 1; i < arguments.length; i++){
-              while(addArgs[argIndex] !== undefined){
-                argIndex++;
-              }
-              addArgs[argIndex] = arguments[i];
-            }
-            if(end){
-              cb(...addArgs, f);
-            }else{
-              cb(f, ...addArgs);
-            }
-          }};
-        }
-        // pre arg with first
-        return {call: function(){
-          const addArgs = [...args];
-          let argIndex = 0;
-          for(let i = 0; i < arguments.length; i++){
-            while(addArgs[argIndex] !== undefined){
-              argIndex++;
-            }
-            addArgs[argIndex] = arguments[i];
-          }
-          if(end){
-            cb(...addArgs, first);
-          }else{
-            cb(first, ...addArgs);
-          }
-        }};
-      }
-      // no pre args
-      if(end){
-        return {call: function(){
-          let a = arguments;
-          let f = a.shift();
-          cb(...a, f);
-        }};
-      }
-      return {call: function(){
-        cb(...arguments);
-      }};
-    }
-    // normal function
-    if(Array.isArray(args)){
-      const first = args.shift();
-      if(first === undefined){
-        // pre arg without first
-        return {call: function(){
-          const addArgs = [...args];
-          let f = arguments[0];
-          let argIndex = 0;
-          for(let i = 1; i < arguments.length; i++){
-            while(addArgs[argIndex] !== undefined){
-              argIndex++;
-            }
-            addArgs[argIndex] = arguments[i];
-          }
-          cb.call(f, ...addArgs);
-        }};
-      }
-      // pre arg with first
-      return {call: function(){
-        const addArgs = [...args];
-        let argIndex = 0;
-        for(let i = 0; i < arguments.length; i++){
-          while(addArgs[argIndex] !== undefined){
-            argIndex++;
-          }
-          addArgs[argIndex] = arguments[i];
-        }
-        cb.call(first, ...addArgs);
-      }};
-    }
-    // no pre args
-    return {call: function(){
-      cb.call(...arguments);
-    }};
-  }
 
-
-  // main method
+  //* main method
   function $(param, elm = document){
     if(param instanceof Element){return param;}
 
@@ -425,7 +519,7 @@ class Element extends Array {
   }
 
 
-  // common elements
+  //* common document elements
   $.root = (function(){
     return new Element(document.querySelectorAll(':root')[0]);
   })();
@@ -451,7 +545,12 @@ class Element extends Array {
   })();
 
 
-  // common methods
+  //* common methods
+
+  // get the typeof a variable, with some additional common instanceof types
+  // will also return: array, nan, null, regex, element (jqalt), nodelist, node
+  //
+  // add a second arg to return true if a type matches a given value
   $.type = function(value, types){
     let type;
     if(Array.isArray(value)){
@@ -482,10 +581,49 @@ class Element extends Array {
     return type;
   };
 
+  // return true if an variable is a typeof jqalt element
   $.isElement = function(v){
     return !!(v instanceof Element);
   };
 
+  // return true if an element matches a selector
+  $.isQuery = function(elm, sel){
+    if(typeof elm === 'string'){[elm, sel] = [sel, elm];}
+    if(typeof sel !== 'string' || sel === ''){return true;}
+
+    if(Array.isArray(elm)){
+      return elm.map(e => $.isQuery(e));
+    }
+
+    let match = true;
+    sel.replace(/\[\s*([\w_\-$\.]+)\s*=\s*(["'])((?:\\[\\"']|.)*?)\1\s*\]/g, function(_, key, q, value){
+      if(elm.getAttribute(key) !== value){
+        match = false;
+      }
+    });
+    if(!match){return false;}
+
+    sel.replace(/\[\s*([\w_\-$\.]+)\s*=\s*(.*?)\s*\]/g, function(_, key, value){
+      if(elm.getAttribute(key) !== value){
+        match = false;
+      }
+    });
+    if(!match){return false;}
+
+    sel.replace(/([.#]|)([\w_\-$\.]+)/g, function(_, key, value){
+      if(key === '.' && !elm.classList?.contains(value)){
+        match = false;
+      }else if(key === '#' && elm.id !== value){
+        match = false;
+      }else if(key === '' && elm.tagName?.toLowerCase() !== value.toLowerCase()){
+        match = false;
+      }
+    });
+
+    return match;
+  };
+
+  // call a function when the DOM is ready
   $.ready = function(cb){
     let loaded = false;
 
@@ -519,6 +657,8 @@ class Element extends Array {
     };
   };
 
+  // fetch data from the server
+  // this uses the modern 'fetch' method as an alternative to ajax
   $.fetch = function(url, data = {}, cb = () => {}, {method = 'POST', timeout = 30000, type = 'json'} = {}){
     const opts = {method, timeout, type};
     if(typeof data === 'function'){
@@ -607,12 +747,14 @@ class Element extends Array {
     return this;
   };
 
+  // import and load a stylesheet if its not already loaded
   $.style = function(href){
     if(!$('link[rel="stylesheet"]').hasAttr('href', href)){
       $.head.append(`<link rel="stylesheet" href="${href.replace(/"/g, '&quot;')}">`);
     }
   };
 
+  // import and load a script if its not already loaded
   $.script = function(src){
     if(!$('script').hasAttr('src', src)){
       $.head.append(`<script src="${src.replace(/"/g, '&quot;')}"></script>`);
@@ -620,39 +762,94 @@ class Element extends Array {
   };
 
 
+  // ensure a function, given the same id, will only run once
   const ranFunctions = [];
   $.once = function(id, cb){
-    if(typeof id === 'function'){
-      [id, cb] = [cb, id];
-    }
+    if(typeof id === 'function'){[id, cb] = [cb, id];}
     if(ranFunctions[id]){
       return;
     }
-    ranFunctions[id] = true;
+    if(id === undefined){
+      id = Date.now().toString() + '.' + Math.floor(Math.random() * 10000).toString();
+    }
+    ranFunctions[id.toString()] = true;
     cb();
   };
 
+  // run a callback on an interval
+  // you can also limit how many times the interval cn run
+  // optional stop method passed for stopping the interval
   $.loop = function(ms, cb, limit){
     [ms, cb, limit] = $.sort([ms, 'num'], [cb, 'func'], [limit, 'num']);
-
     if(typeof cb !== 'function'){
       return undefined;
     }
-
-    cb = func(cb, [{stop}], true);
+    if(typeof limit !== 'number'){
+      limit = null;
+    }
 
     function stop(){
       clearInterval(interval);
     }
 
     const interval = setInterval(function(){
-      cb.call(limit);
-      if(limit !== undefined && --limit <= 0){
+      cb.call(limit, stop);
+      if(limit === null && --limit <= 0){
         clearInterval(interval);
       }
     }, ms);
   };
 
+  // adds a rate limit to how frequently a method can be called
+  // minimum = 2ms
+  // (useful for preventing methods from double firing)
+  //
+  // note: set this.type to prevent changing event types in less than 250ms
+  // this can help prevent multiple different event types from double firing
+  // without slowing down the first event
+  //
+  // this method is used by the "on" and "once" jqalt methods automatically
+  // and may be used by other methods where they make sense
+  $.limit = function(ms, cb){
+    if(typeof ms === 'function'){[ms, cb] = [cb, ms];}
+    if(typeof cb !== 'function'){
+      return undefined;
+    }
+    if(typeof ms !== 'number' || ms < 2){
+      ms = 2;
+    }
+
+    let last = 0;
+    let lastType = null;
+
+    const thisCB = function(){
+      let now = Date.now();
+      if(now - last < ms){
+        return;
+      }
+
+      // allow events to specify a type to prevent longer delays across multiple events
+      // this allows the event to fire rapidly within a short time, while also preventing
+      // duplicates across different events
+      //
+      // example: if both mousedown and touchstart are triggered, the method should
+      // only run for one of these 2 events, without slowing down the first event
+      if(thisCB.type){
+        if(thisCB.type !== lastType && now - last < 250){
+          return;
+        }
+        lastType = thisCB.type;
+      }
+
+      last = now;
+      cb.call(this, ...arguments);
+    };
+
+    return thisCB;
+  };
+
+  // sorts function arguments by type
+  // (useful for adding dynamic argument order to a function)
   $.sort = function(){
     let params = [];
     for(let i in arguments){
@@ -692,16 +889,8 @@ class Element extends Array {
     return params;
   };
 
-  $.call = function(cb, thisArg){
-    const args = [...arguments];
-    args.splice(0, 2);
-    if(args.length){
-      return cb.call(thisArg, ...args, thisArg);
-    }else{
-      return cb.call(thisArg, thisArg);
-    }
-  };
-
+  // adds a function to the Element class
+  // (useful for plugins)
   $.method = function(name, cb){
     if(!Array.isArray(name)){
       name = [name];
@@ -724,8 +913,59 @@ class Element extends Array {
     return added;
   };
 
+  // returns a string of the html attribute that is the url type,
+  // of a given element by tag name
+  const elementUrlTagTypes = {
+    src: [
+      'iframe',
+      'img',
+      'script',
+      'frame',
+      'embed',
+      'source',
+      'input',
+      'audio',
+      'track',
+      'video',
+    ],
+    href: [
+      'link',
+      'a',
+      'area',
+      'base',
+      'image',
+    ],
+    other: {
+      'applet': 'codebase',
+      'blockquote': 'cite',
+      'body': 'background',
+      'del': 'cite',
+      'form': 'action',
+      'head': 'profile',
+      'ins': 'cite',
+      'object': 'data',
+      'q': 'cite',
+      'button': 'formaction',
+      'command': 'icon',
+      'html': 'manifest',
+    }
+  };
+  $.urlTag = function(tag){
+    if(elementUrlTagTypes.src.includes(tag)){
+      return 'src';
+    }else if(elementUrlTagTypes.href.includes(tag)){
+      return 'href';
+    }
 
-  // export
+    if(elementUrlTagTypes.other[tag]){
+      return elementUrlTagTypes.other[tag];
+    }
+
+    return null;
+  };
+
+
+  //* export
   window.$ = Object.freeze($);
   window.jqalt = Object.freeze($);
   window.jqAlt = Object.freeze($);
