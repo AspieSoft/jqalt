@@ -67,6 +67,7 @@ import {$} from '../selector.js'
   });
   return this;
 });*/
+
 $.method(['attr', 'prop'], function(key, value){
   const keyType = varType(key);
 
