@@ -662,23 +662,29 @@ class Element extends Array {
       case 'str':
         return 'string';
       case 'num':
+      case 'int':
         return 'number';
       case 'bool':
         return 'boolean';
       case 'obj':
         return 'object';
       case 'arr':
+      case 'list':
         return 'array';
       case 'void':
       case 'func':
+      case 'fn':
+      case 'cb':
+      case 'callback':
         return 'function';
-      case 'regex' || 'reg':
+      case 'regex':
+      case 'reg':
         return 'regexp';
       case 'elm':
       case 'elem':
         return 'element';
-      case 'list':
-        return 'nodelist';
+      case 'nil':
+        return 'null';
       default:
         return t.toLowerCase();        
     }
@@ -1067,8 +1073,23 @@ class Element extends Array {
   // sorts function arguments by type
   // (useful for adding dynamic argument order to a function)
   //
+  // example:
+  //  [arg1, arg2, arg3] = $.sort([arg1, 'str'], [arg2, 'obj', 'arr'], [arg3, 'bool'])
+  //  [key, val, cb] = $.sort([key, 'str', 'num'], [val, 'str', 'obj', 'arr', 'regex'], [cb, 'func'])
+  //
+  // note: this method uses $.type and the fixTypeStr method to evaluate variable types and allow for
+  // optional common shorthands.
+  //
+  //  [arg1, arg2, arg3, arg4, fallback] = $.sort(
+  //    [arg1, 'str' || 'string', 'num' || 'int' || 'number', 'bool' || boolean],
+  //    [arg2, 'nan', 'null' || 'nil', 'undefined'],
+  //    [arg3, 'func' || 'fn' || 'void' || 'cb' || 'callback' || 'function'],
+  //    [arg4, 'obj' || 'object', 'arr' || 'list' || 'array', 'regex' || 'reg' || 'regexp'],
+  //    [fallback], // set no type parameters to allow any type
+  //  )
+  //
   // Note:
-  //  I wrote this function long ago, and didn't write any documentation on how it works.
+  //  I wrote this function long ago, and didn't write any documentation.
   //  I cannot remember how it works, so we will just call this a magic sort function.
   //  If it works, don't touch it.
   $.sort = function(){
