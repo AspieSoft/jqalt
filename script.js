@@ -451,7 +451,7 @@ class Element extends Array {
   // include addClass, hasClass, delClass, toggleClass
 
   //todo: allow callback to detect class changes (onClass) (mayby add offClass)
-  // (or may just use existing class methods with an optional callback)
+  //* (or may just use existing class methods with an optional callback)
   // for callback on change event, include what classes were added and removed
   // (or include old and new class list)
   // if no key is specified, include any key as a function argument
