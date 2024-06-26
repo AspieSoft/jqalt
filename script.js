@@ -1066,6 +1066,11 @@ class Element extends Array {
 
   // sorts function arguments by type
   // (useful for adding dynamic argument order to a function)
+  //
+  // Note:
+  //  I wrote this function long ago, and didn't write any documentation on how it works.
+  //  I cannot remember how it works, so we will just call this a magic sort function.
+  //  If it works, don't touch it.
   $.sort = function(){
     let params = [];
     for(let i in arguments){
