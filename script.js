@@ -1,5 +1,6 @@
 class Element extends Array {
-  dataStorage = [];
+  storage = [];
+  // lastFocus = null;
 
   // store javascript side data on a particular element or list of elements
   //
@@ -12,30 +13,30 @@ class Element extends Array {
       index = -1;
     }
 
-    if(typeof this.dataStorage[index] !== 'object'){
-      this.dataStorage[index] = {};
+    if(typeof this.storage[index] !== 'object'){
+      this.storage[index] = {};
     }
 
     switch ($.type(key)) {
       case 'function':
-        key.call(this, this.dataStorage[index]);
+        key.call(this, this.storage[index]);
         return this;
       case 'undefined':
-        return this.dataStorage[index];
+        return this.storage[index];
       case 'object':
         let keys = Object.keys(key);
         for(let i in keys){
           if(key[keys[i]] === null){
-            delete this.dataStorage[index][keys[i]];
+            delete this.storage[index][keys[i]];
           }else{
-            this.dataStorage[index][keys[i]] = key[keys[i]];
+            this.storage[index][keys[i]] = key[keys[i]];
           }
         }
         return this;
       case 'array':
         let res = {};
         for(let i in key){
-          res[key[i]] = this.dataStorage[index][key[i]];
+          res[key[i]] = this.storage[index][key[i]];
         }
 
         if(typeof value === 'function'){
@@ -49,23 +50,17 @@ class Element extends Array {
 
     switch ($.type(value)) {
       case 'function':
-        key.call(this, this.dataStorage[index][key]);
+        key.call(this, this.storage[index][key]);
         return this;
       case 'undefined':
-        return this.dataStorage[index][key];
+        return this.storage[index][key];
       case 'null':
-        delete this.dataStorage[index][key];
+        delete this.storage[index][key];
         return this;
       default:
-        this.dataStorage[index][key] = value;
+        this.storage[index][key] = value;
         return this;
     }
-  }
-
-  // return element from a specified index
-  // default: 0
-  elm(index = 0){
-    return this[index];
   }
 
   // add elements to query list
@@ -86,39 +81,86 @@ class Element extends Array {
       sel = sel.split(/(,|[^,]*\[(?:".*?"|'.*?'|`.*?`|.)*?\][^,]*)/).map(s => s.trim()).filter(s => s !== '' && s !== ',');
     }
 
-    this.forEach((elm, index) => {
-      if(elm != null){
+    for(let i in this){
+      if(this[i] instanceof Node){
         // check for matching selector
         if(Array.isArray(sel)){
           let m = false;
           for(let s of sel){
-            if($.isQuery(elm, s)){
+            if($.isQuery(this[i], s)){
               m = true;
             }
           }
 
           if(!m){
-            return;
+            continue;
           }
         }
 
         // make elm an instance of jqalt Element
-        const e = new Element(elm);
+        const elm = new Element(this[i]);
 
         // merge dataStorage index of element
-        if(typeof this.dataStorage[index] !== 'object'){
-          this.dataStorage[index] = {};
+        if(typeof this.storage[i] !== 'object'){
+          this.storage[i] = {};
         }
-        e.dataStorage[-1] = this.dataStorage[index];
+        elm.storage[-1] = this.storage[i];
 
         // run callback method with 'this' var as the element instance
         // return normal elm node as 1st arg
         // return list index as 2nd arg
-        cb.call(e, elm, index);
+        //
+        // if callback returns false, stop the loop
+        if(cb.call(elm, this[i], i) === false){
+          break;
+        }
       }
-    });
+    }
 
     return this;
+  }
+
+  // return element from a specified index
+  // default: 0
+  elm(index, sel, cb){
+    [index, sel, cb] = $.sort([index, 'num'], [sel, 'str', 'arr', 'obj'], [cb, 'func']);
+
+    if(typeof index !== 'number' || index < 0){
+      index = 0;
+    }
+
+    let elm = null;
+
+    if(!sel){
+      if(this[index] instanceof Node){
+        // make elm an instance of jqalt Element
+        elm = new Element(this[index]);
+
+        // merge dataStorage index of element
+        if(typeof this.storage[index] !== 'object'){
+          this.storage[index] = {};
+        }
+        elm.storage[-1] = this.storage[index];
+      }
+    }else{
+      let i = 0;
+      this.each(sel, function(){
+        if(i !== index){
+          i++;
+          return true;
+        }
+  
+        elm = this;
+        return false;
+      });
+    }
+
+    if(elm != null && typeof cb === 'function'){
+      cb.call(elm, elm[0]);
+      return this;
+    }
+
+    return elm;
   }
 
   // addEventListener
@@ -214,6 +256,79 @@ class Element extends Array {
   // for events
   // may call existing jqalt methods
   // use both on and do events
+
+  // triggers or detects a click event
+  // when triggered, this method will also append the document.activeElement to the manual $.focus method
+  click(sel, cb, opts){
+    [sel, cb, opts] = $.sort([sel, 'str'], [cb, 'func'], [opts, 'obj']);
+    if(typeof opts !== 'object' && opts !== 'boolean'){opts = {};}
+
+    if(typeof cb !== 'function'){
+      return this.do('click', sel, opts);
+    }
+
+    this.on('mousedown touchstart', sel, () => {
+      $.focus(true);
+    }, opts);
+
+    return this.on('click', sel, cb, opts);
+  }
+
+  // triggers or detects a focus event
+  // when triggered, this method will also append the document.activeElement to the manual $.focus method
+  focus(sel, cb, opts){
+    [sel, cb, opts] = $.sort([sel, 'str'], [cb, 'func'], [opts, 'obj']);
+    if(typeof opts !== 'object' && opts !== 'boolean'){opts = {};}
+
+    if(typeof cb !== 'function'){
+      $.focus(true);
+      this.elm(0, sel)[0].focus();
+      return this;
+    }
+
+    return this.on('focus', sel, cb, opts);
+  }
+
+  // triggers or detects a blur event
+  // set focusLast to autofocus the last active element before this one
+  // focusLast will use the manual $.focus method
+  blur(sel, cb, opts, focusLast){
+    [sel, cb, opts, focusLast] = $.sort([sel, 'str'], [cb, 'func'], [opts, 'obj'], [focusLast, 'bool']);
+    if(typeof opts !== 'object' && opts !== 'boolean'){opts = {};}
+
+    if(typeof cb !== 'function'){
+      const elm = this.elm(0, sel)[0];
+
+      let oldElm = null;
+      if(focusLast){
+        oldElm = $.focus(-1, true);
+
+        if(oldElm === elm){
+          oldElm = $.focus(-1, true);
+        }
+
+        if(oldElm === elm){
+          oldElm = null;
+        }
+      }
+
+      elm.blur();
+
+      // focus document body if blur fails
+      if(document.activeElement === elm){
+        $.body[0].focus();
+      }
+
+      // focus previous element
+      if(focusLast && oldElm instanceof Node){
+        oldElm.focus();
+      }
+
+      return this;
+    }
+
+    return this.on('blur', sel, cb, opts);
+  }
 
   //todo: add css method
   // auto allow custom css properties with --var syntax
@@ -963,6 +1078,59 @@ class Element extends Array {
 
     return null;
   };
+
+  // keeps and returns the history of the last focused elements
+  // the most recent elements will be at the beginning of the array
+  const focusHistory = [];
+  const focusHistoryManual = [];
+
+  const addManualFocus = $.limit(250, function(){
+    if(focusHistoryManual[0] !== document.activeElement){
+      focusHistoryManual.unshift(document.activeElement);
+      if(focusHistoryManual.length > 10){
+        focusHistoryManual.splice(10 - focusHistoryManual.length)
+      }
+    }
+  });
+
+  $.focus = function(index, manual){
+    if(typeof index === 'boolean'){[index, manual] = [manual, index];}
+
+    if(manual && typeof index !== 'number'){
+      addManualFocus();
+    }
+
+    if(typeof index !== 'number'){index = 0;}
+
+    if(index < 0){
+      let res = null;
+      index *= -1;
+
+      if(manual){
+        res = focusHistoryManual[index-1];
+        focusHistoryManual.splice(0, index);
+      }else{
+        res = focusHistory[index-1];
+        focusHistory.shift(0, index);
+      }
+
+      return res;
+    }
+
+    if(manual){
+      return focusHistoryManual[index]
+    }
+    return focusHistory[index];
+  };
+
+  setInterval(function(){
+    if(focusHistory[0] !== document.activeElement){
+      focusHistory.unshift(document.activeElement);
+      if(focusHistory.length > 10){
+        focusHistory.splice(10 - focusHistory.length)
+      }
+    }
+  }, 250);
 
 
   //* export
