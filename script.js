@@ -1,6 +1,5 @@
 class Element extends Array {
   storage = [];
-  // lastFocus = null;
 
   // store javascript side data on a particular element or list of elements
   //
