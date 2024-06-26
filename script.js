@@ -330,11 +330,110 @@ class Element extends Array {
     return this.on('blur', sel, cb, opts);
   }
 
-  //todo: add css method
-  // auto allow custom css properties with --var syntax
-  // also allow callback function to detect css changes
-  // for change event, include the old and new value
-  // if no key is specified, include any key as a function argument
+  // get or set a css value
+  //
+  // when getting values, @sel is used as an html selector in an each loop (strings only).
+  // what setting values, @sel is used as a value selector `window.getComputedStyle(elm, sel)`.
+  //
+  // you can pass an object value to set a list of key value pairs.
+  //
+  // you can pass an array value to set the key to an incremental/alternating value per element.
+  // example:
+  //  $('div').css('background', ['blue', 'green', 'red'])
+  //    <div style="background: blue">
+  //    <div style="background: green">
+  //    <div style="background: red">
+  //    <div style="background: blue">
+  //    <div style="background: green">
+  //    <div style="background: red">
+  //
+  // when getting values, @computed has multiple options:
+  //  - true: evaluate a `var(--myvar)` to its computed value.
+  //  - false: do not run window.getComputedStyle when returning values (only use html style tag).
+  //  - null/undefined (default): will not evaluate `var(--myvar)` to its computed value,
+  //    but will fallback to a computed value if the result is null/undefined/''.
+  //
+  // pass a callback function to listen for changes to a css value specified by the key,
+  // or leave the key blank to listen for all css changes.
+  css(key, value, sel, cb, computed){
+    [key, value, sel, cb, computed] = $.sort([key, 'str'], [value, 'str', 'obj', 'arr'], [sel, 'str'], [cb, 'func'], [computed, 'bool']);
+    if(typeof value === 'string' && typeof sel !== 'string' && value.match(/^:[A-Za-z0-9_-]+$/)){
+      [value, sel] = [sel, value];
+    }
+
+    // listen for changes
+    if(typeof cb === 'function'){
+      //todo: add css change listener
+      // for change event, include the old and new value
+      // if no key is specified, include any key as a function argument
+      return this;
+    }
+
+    // set value
+    if(value != null){
+      this.each(sel, function(elm, index){
+        if(typeof key === 'string' && typeof value === 'string'){ // key value string
+          if(key.startsWith('-')){
+            elm.style.setProperty(key, value);
+            return;
+          }
+
+          elm.style[key] = value;
+        }else if(typeof key === 'string' && Array.isArray(value)){ // array value
+          if(value.length < 0){
+            return;
+          }
+          while(index >= value.length){
+            index -= value.length;
+          }
+          if(index < 0){index = 0;}
+
+          if(typeof value[index] === 'string'){
+            elm.style[key] = value[index];
+          }
+        }else if(typeof value === 'object'){
+          for(let k in value){
+            if(typeof value[k] === 'string'){
+              elm.style.setProperty(k, value[k]);
+            }
+          }
+        }
+      });
+
+      return this;
+    }
+
+    // get value
+    const elm = this.elm(0)[0];
+
+    // for performance on simple requests
+    if(!computed && typeof key === 'string' && typeof sel !== 'string' && !key.startsWith('-')){
+      if(elm.style[key] != null && elm.style[key] !== ''){
+        return elm.style[key];
+      }
+    }
+
+    if(computed === false){
+      if(typeof key !== 'string'){
+        return elm.style;
+      }
+
+      return elm.style.getPropertyValue(key);
+    }
+
+    let css = null;
+    if(typeof sel === 'string'){
+      css = window.getComputedStyle(elm, sel);
+    }else{
+      css = window.getComputedStyle(elm);
+    }
+
+    if(typeof key !== 'string'){
+      return css;
+    }
+
+    return css.getPropertyValue(key);
+  }
 
   //todo: add methods for setting html attributes
   // include attr (set and get), hasAttr, delAttr
