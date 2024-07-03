@@ -575,6 +575,8 @@ class Element extends Array {
   //? for html attributes
   // may call existing jqalt methods
 
+  //todo: test class methods
+
   // add a list of classes to an html element
   //
   // pass the first arg as a callback function, to detect when a class changes
