@@ -251,11 +251,6 @@ class Element extends Array {
     return this;
   }
 
-  //todo: add methods: click, fucus, blur
-  //? for events
-  // may call existing jqalt methods
-  // use both on and do events
-
   // triggers or detects a click event
   // when triggered, this method will also append the document.activeElement to the manual $.focus method
   click(sel, cb, opts){
@@ -437,6 +432,147 @@ class Element extends Array {
   //todo: add methods for setting html attributes
   // include attr (set and get), hasAttr, delAttr
   // also have attr method return null if a key exists, but does not have a value
+
+  // get or set an html attribute (or use a '--key' to set a css property/variable)
+  //
+  // note: this method functions in a similar way to the "css" method
+  attr(key, value, sel, cb){
+    [key, value, sel, cb] = $.sort([key, 'str'], [value, 'str', 'obj', 'arr'], [sel, 'str'], [cb, 'func']);
+
+    // listen for changes
+    if(typeof cb === 'function'){
+      //todo: add html attribute change listener
+      // for change event, include the old and new value
+      return this;
+    }
+
+    // set value
+    if(value != null){
+      this.each(sel, function(elm, index){
+        if(typeof key === 'string' && typeof value === 'string'){ // key value string
+          if(key.startsWith('--')){
+            elm.style.setProperty(key, value);
+            return;
+          }
+
+          elm.setAttribute(key, value);
+        }else if(typeof key === 'string' && Array.isArray(value)){ // array value
+          if(value.length < 0){
+            return;
+          }
+          while(index >= value.length){
+            index -= value.length;
+          }
+          if(index < 0){index = 0;}
+
+          if(key.startsWith('--')){
+            if(typeof value[index] === 'string'){
+              elm.style.setProperty(key, value[index]);
+            }
+          }else if(typeof value[index] === 'string'){
+            elm.setAttribute(key, value[index]);
+          }
+        }else if(typeof value === 'object'){
+          for(let k in value){
+            if(k.startsWith('--')){
+              if(typeof value[k] === 'string'){
+                elm.style.setProperty(k, value[k]);
+              }
+            }else if(typeof value[k] === 'string'){
+              elm.setAttribute(k, value[k]);
+            }
+          }
+        }
+      });
+
+      return this;
+    }
+
+    // get value
+    const elm = this.elm(0, sel)[0];
+
+    if(typeof key === 'string'){
+      if(key.startsWith('--')){
+        elm.style.getPropertyValue(key);
+      }
+      return elm.getAttribute(key);
+    }
+  }
+
+  // return true if an element has an html attribute
+  //
+  // pass an array @key to check if element has all of the attributes in a list
+  //
+  // @callback: check every element, and run a callback funnction for each element that has the specified attribute
+  hasAttr(key, sel, cb){
+    [key, sel, cb] = $.sort([key, 'str', 'arr'], [sel, 'str'], [cb, 'func']);
+    if(key == null){return this;}
+
+    if(typeof cb === 'function'){
+      this.each(sel, function(elm, index){
+        if(Array.isArray(key)){
+          let hasAttr = key.length !== 0;
+          for(let k of key){
+            if(typeof k === 'string'){
+              if(!elm.hasAttribute(k)){
+                hasAttr = false;
+                break;
+              }
+            }
+          }
+
+          if(hasAttr){
+            return cb.call(this, elm, index);
+          }
+        }
+
+        if(elm.hasAttribute(key)){
+          return cb.call(this, elm, index);
+        }
+      });
+
+      return this;
+    }
+
+    const elm = this.elm(0, sel)[0];
+
+    if(Array.isArray(key)){
+      let hasAttr = key.length !== 0;
+      for(let k of key){
+        if(typeof k === 'string'){
+          if(!elm.hasAttribute(k)){
+            hasAttr = false;
+            break;
+          }
+        }
+      }
+
+      return hasAttr;
+    }
+
+    return elm.hasAttribute(key);
+  }
+
+  // delete an html attribute
+  //
+  // pass an array @key to remove multiple attributes
+  delAttr(key, sel){
+    [key, sel] = $.sort([key, 'str', 'arr'], [sel, 'str']);
+    if(key == null){return this;}
+
+    this.each(sel, function(elm, index){
+      if(Array.isArray(key)){
+        for(let k of key){
+          elm.removeAttribute(k);
+        }
+        return;
+      }
+
+      elm.removeAttribute(key);
+    });
+
+    return this;
+  }
 
   //todo: allow attr method to accept a callback to detect when an attribute is changed
   // also include the old and new value, and the type of change (added, removed, changed) || (add, del, set)
