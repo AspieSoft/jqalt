@@ -575,6 +575,8 @@ class Element extends Array {
   //? for html attributes
   // may call existing jqalt methods
 
+  //todo: add html and text methods for getting and setting an elements content
+
   //todo: test class methods
 
   // add a list of classes to an html element
@@ -651,6 +653,8 @@ class Element extends Array {
 
     return hasClass;
   }
+
+  //todo: add append and moving methods
 }
 
 ;(function(){
