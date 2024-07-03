@@ -120,7 +120,7 @@ class Element extends Array {
   }
 
   // return element from a specified index
-  // default: 0
+  // @index default: 0
   elm(index, sel, cb){
     [index, sel, cb] = $.sort([index, 'num'], [sel, 'str', 'arr', 'obj'], [cb, 'func']);
 
@@ -439,6 +439,7 @@ class Element extends Array {
     if(typeof cb === 'function'){
       //todo: add html attribute change listener
       // for change event, include the old and new value
+      // also include the type of change (added, removed, changed) || (add, del, set)
       return this;
     }
 
@@ -570,25 +571,84 @@ class Element extends Array {
     return this;
   }
 
-  //todo: allow attr method to accept a callback to detect when an attribute is changed
-  // also include the old and new value, and the type of change (added, removed, changed) || (add, del, set)
-  // if no key is specified, include any key as a function argument
-
   //todo: add methods: id, tag, type, name, value, url (smart href || src) (use $.urlTag)
   //? for html attributes
   // may call existing jqalt methods
 
-  //todo: add class methods
-  // include addClass, hasClass, delClass, toggleClass
+  // add a list of classes to an html element
   //
-  // (may add class method to try and to multiple tasks) [addClass if value, hasClass if key only, delClass if bool false, toggleClass if bool null]
-  // may need to include simple named methods as shorthands for ease of use
+  // pass the first arg as a callback function, to detect when a class changes
+  addClass(cb){
+    if(typeof cb === 'function'){
+      //todo: detect when a class is added
+      // include classname in callback
+      // if no keys specified, use any key
+      // may also include old and new classlist
+      return this;
+    }
 
-  //todo: allow callback to detect class changes (onClass) (mayby add offClass)
-  //* (or may just use existing class methods with an optional callback)
-  // for callback on change event, include what classes were added and removed
-  // (or include old and new class list)
-  // if no key is specified, include any key as a function argument
+    this.each(function(elm, index){
+      elm.classList.add(...arguments);
+    });
+
+    return this;
+  }
+
+  // remove a list of classes from an html element
+  //
+  // pass the first arg as a callback function, to detect when a class changes
+  delClass(cb){
+    if(typeof cb === 'function'){
+      //todo: detect when a class is removed
+      // include classname in callback
+      // if no keys specified, use any key
+      // may also include old and new classlist
+      return this;
+    }
+
+    this.each(function(elm, index){
+      elm.classList.remove(...arguments);
+    });
+
+    return this;
+  }
+
+  // toggle a list of classes in an html element
+  //
+  // pass the first arg as a callback function, to detect when a class changes
+  toggleClass(cb){
+    if(typeof cb === 'function'){
+      //todo: detect when a class is changed
+      // include classname in callback
+      // if no keys specified, use any key
+      // may also include old and new classlist
+      // include change type (add || del)
+      return this;
+    }
+
+    this.each(function(elm, index){
+      elm.classList.toggle(...arguments);
+    });
+
+    return this;
+  }
+
+  // detect if an element has a class or list of classes
+  //
+  // note: this method only checks the first jqalt element
+  hasClass(){
+    const elm = this.elm(0, sel)[0];
+
+    let hasClass = arguments.length !== 0;
+    for(let arg in arguments){
+      if(!elm.classList.contains(arg)){
+        hasClass = false;
+        break;
+      }
+    }
+
+    return hasClass;
+  }
 }
 
 ;(function(){
