@@ -350,7 +350,7 @@ class Element extends Array {
   // pass a callback function to listen for changes to a css value specified by the key,
   // or leave the key blank to listen for all css changes.
   css(key, value, sel, cb, computed){
-    [key, value, sel, cb, computed] = $.sort([key, 'str'], [value, 'str', 'obj', 'arr'], [sel, 'str'], [cb, 'func'], [computed, 'bool']);
+    [key, value, sel, cb, computed] = $.sort([key, 'str'], [value, 'str', 'obj', 'arr', 'null'], [sel, 'str'], [cb, 'func'], [computed, 'bool']);
     if(typeof value === 'string' && typeof sel !== 'string' && value.match(/^:[A-Za-z0-9_-]+$/)){
       [value, sel] = [sel, value];
     }
@@ -428,10 +428,6 @@ class Element extends Array {
 
     return css.getPropertyValue(key);
   }
-
-  //todo: add methods for setting html attributes
-  // include attr (set and get), hasAttr, delAttr
-  // also have attr method return null if a key exists, but does not have a value
 
   // get or set an html attribute (or use a '--key' to set a css property/variable)
   //
