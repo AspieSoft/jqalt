@@ -591,7 +591,7 @@ class Element extends Array {
       return this;
     }
 
-    this.each(function(elm, index){
+    this.each((elm, index) => {
       elm.classList.add(...arguments);
     });
 
@@ -610,7 +610,7 @@ class Element extends Array {
       return this;
     }
 
-    this.each(function(elm, index){
+    this.each((elm, index) => {
       elm.classList.remove(...arguments);
     });
 
@@ -630,8 +630,10 @@ class Element extends Array {
       return this;
     }
 
-    this.each(function(elm, index){
-      elm.classList.toggle(...arguments);
+    this.each((elm, index) => {
+      for(let arg of arguments){
+        elm.classList.toggle(arg);
+      }
     });
 
     return this;
@@ -641,10 +643,12 @@ class Element extends Array {
   //
   // note: this method only checks the first jqalt element
   hasClass(){
-    const elm = this.elm(0, sel)[0];
+    //todo: consider replacing first element checks, with all element checks
+    // also consider for other elements
+    const elm = this.elm(0)[0];
 
     let hasClass = arguments.length !== 0;
-    for(let arg in arguments){
+    for(let arg of arguments){
       if(!elm.classList.contains(arg)){
         hasClass = false;
         break;
